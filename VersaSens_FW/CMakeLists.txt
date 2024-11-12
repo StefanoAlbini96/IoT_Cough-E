@@ -18,6 +18,7 @@ include_directories(
     opus-1.2.1/arm
     src/drivers
     src/VersaAPI
+    src/cough_E_app/inc
 )
 
 project(VersaSens)
@@ -35,9 +36,18 @@ file(GLOB API
     "src/VersaAPI/*.c" 
 )
 
+file(GLOB APP_SRC
+    "src/cough_E_app/code/*.c"
+)
+
 target_sources(app PRIVATE 
     src/main.c 
     ${DRIVERS}
     ${API}
     ${OPUS_SOURCES}
+    ${APP_SRC}
 )
+
+
+# Link the math library
+target_link_libraries(app PRIVATE m)

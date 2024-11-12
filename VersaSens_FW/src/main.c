@@ -21,6 +21,7 @@
 #include <zephyr/fs/fs.h>
 #include <ff.h>
 #include <SPI_Heepocrates.h>
+#include <launcher.h>
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
@@ -37,7 +38,10 @@ int main(void)
     versa_start_led_thread();
     versa_start_mode_thread();
 
-    SPI_Heepocrates_init();
+    // Start the Cough-E thread for the application
+    start_coughE_thread(); 
+
+    // SPI_Heepocrates_init();
 
     while (1)
     {
