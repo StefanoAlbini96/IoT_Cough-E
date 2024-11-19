@@ -93,6 +93,11 @@ struct sensor_data_ble {
 	size_t size;  // size of the data
 };
 
+struct app_result_ble {
+    void *fifo_reserved;
+    uint8_t result;
+};
+
 struct battery_data {
     void *fifo_reserved;  // reserved for use by k_fifo
     uint16_t data;  // battery data
@@ -140,6 +145,8 @@ void send_notification_to_custom_chara(void);
     * @param size the size of the data
 */
 void receive_sensor_data(uint8_t *data, size_t size);
+
+void ble_receive_final_data(uint8_t *data);
 
 /*
     * @brief Receive the battery data for the BLE service

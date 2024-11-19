@@ -13,6 +13,7 @@ void init_state(){
 #endif
 
 fsm_state.model_cls_out = NON_COUGH_OUT;
+fsm_state.timestamp_last_out = 0.0;
 fsm_state.time_from_last_out = 0.0;
 fsm_state.time_start_wind = 0.0;
 fsm_state.time_start_last_wind = 0.0;

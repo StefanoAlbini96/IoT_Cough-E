@@ -79,7 +79,7 @@ Description : Original version.
 #define T5838_PRIO          K_PRIO_PREEMPT(8)
 
 /*Priority of the Bluetooth thread */
-#define BLE_PRIO            K_PRIO_PREEMPT(11)
+#define BLE_PRIO            K_PRIO_PREEMPT(2)
 
 /*Priority of the storage thread */
 #define STORAGE_PRIO        K_PRIO_PREEMPT(10)

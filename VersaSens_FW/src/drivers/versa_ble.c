@@ -171,21 +171,24 @@ uint8_t BLE_cmd = BLE_CMD_MODE_IDLE;
 
 static K_WORK_DEFINE(start_advertising_worker, start_advertising_coded);
 
-BT_GATT_SERVICE_DEFINE(TEST, BT_GATT_PRIMARY_SERVICE(BT_UUID_DECLARE_128(BT_UUID_CUSTOM_SERVICE)),
-	BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(BT_UUID_CUSTOM_CHARA), BT_GATT_CHRC_NOTIFY | BT_GATT_CHRC_READ,
-						BT_GATT_PERM_READ, NULL, NULL, NULL),
-	BT_GATT_CCC(NULL, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-	BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(BT_UUID_CUSTOM_CHARA_WRITE), BT_GATT_CHRC_WRITE,
-						BT_GATT_PERM_WRITE, NULL, NULL, NULL),
-	BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(BT_UUID_CUSTOM_CHARA_STATUS), BT_GATT_CHRC_READ,
-						BT_GATT_PERM_READ | BT_GATT_PERM_WRITE, read_status, NULL, NULL),
-	BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(BT_UUID_CUSTOM_CHARA_CMD), BT_GATT_CHRC_WRITE | BT_GATT_CHRC_INDICATE,
-						BT_GATT_PERM_WRITE | BT_GATT_PERM_READ, NULL, write_cmd, NULL),
-	BT_GATT_CCC(NULL, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+BT_GATT_SERVICE_DEFINE(TEST, 
+						BT_GATT_PRIMARY_SERVICE(BT_UUID_DECLARE_128(BT_UUID_CUSTOM_SERVICE)),
+						BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(BT_UUID_CUSTOM_CHARA), BT_GATT_CHRC_NOTIFY | BT_GATT_CHRC_READ,
+											BT_GATT_PERM_READ, NULL, NULL, NULL),
+						BT_GATT_CCC(NULL, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+						BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(BT_UUID_CUSTOM_CHARA_WRITE), BT_GATT_CHRC_WRITE,
+											BT_GATT_PERM_WRITE, NULL, NULL, NULL),
+						BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(BT_UUID_CUSTOM_CHARA_STATUS), BT_GATT_CHRC_READ,
+											BT_GATT_PERM_READ | BT_GATT_PERM_WRITE, read_status, NULL, NULL),
+						BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(BT_UUID_CUSTOM_CHARA_CMD), BT_GATT_CHRC_WRITE | BT_GATT_CHRC_INDICATE,
+											BT_GATT_PERM_WRITE | BT_GATT_PERM_READ, NULL, write_cmd, NULL),
+						BT_GATT_CCC(NULL, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 );
 
 K_FIFO_DEFINE(ble_fifo);
-K_THREAD_STACK_DEFINE(ble_thread_stack, 1024);
+K_FIFO_DEFINE(ble_out_fifo);	// FIFO for the output cough count
+// K_THREAD_STACK_DEFINE(ble_thread_stack, 1024);
+K_THREAD_STACK_DEFINE(ble_thread_stack, 2048);
 struct k_thread ble_thread_data;
 
 static struct bt_gatt_exchange_params exchange_params;
@@ -322,20 +325,35 @@ void sensor_thread(void)
 {
 	while (1) {
     	// Get sensor data
-    	struct sensor_data_ble *data = k_fifo_get(&ble_fifo, K_FOREVER);
+    	struct sensor_data_ble *data = k_fifo_get(&ble_fifo, K_MSEC(100));	// NO_WAIT so not to block the other communication
+ 
+		if (data != NULL){
+			// Send notification
+			int ret = bt_gatt_notify(NULL, &TEST.attrs[1], data->data, data->size);
 
-    	// Send notification
-    	int ret = bt_gatt_notify(NULL, &TEST.attrs[1], data->data, data->size);
-		if (ret) {
-			LOG_ERR("Failed to notify, error code: %d\n", ret);
-			if (ret != -ENOTCONN) {
-				// nrf_gpio_cfg_output(27);
-            	// nrf_gpio_pin_clear(27);
+			if (ret) {
+				LOG_ERR("Failed to notify, error code: %d\n", ret);
+				if (ret != -ENOTCONN) {
+					// nrf_gpio_cfg_output(27);
+					// nrf_gpio_pin_clear(27);
+				}
 			}
 		}
-
     	// Free the sensor data
     	k_free(data);
+
+    	// Get output data (cough-counts)
+		struct app_result_ble *data_res = k_fifo_get(&ble_out_fifo, K_MSEC(100));
+		
+		if(data_res != NULL){
+			int ret_res = bt_gatt_notify(NULL, &TEST.attrs[1], &data_res->result, (size_t)1);
+			if (ret_res) {
+				LOG_ERR("Failed to notify, error code: %d\n", ret_res);
+				if (ret_res != -ENOTCONN) {
+				}
+			}
+		}
+    	k_free(data_res);
 	}
 }
 
@@ -356,6 +374,16 @@ void receive_sensor_data(uint8_t *data, size_t size)
 
 	// Put the sensor data in the FIFO
 	k_fifo_put(&ble_fifo, new_data);
+}
+
+
+void ble_receive_final_data(uint8_t *data){
+
+	struct app_result_ble *result_data = k_malloc(sizeof(*result_data));
+
+	result_data->result = *data;
+
+	k_fifo_put(&ble_out_fifo, result_data);
 }
 
 /****************************************************************************/

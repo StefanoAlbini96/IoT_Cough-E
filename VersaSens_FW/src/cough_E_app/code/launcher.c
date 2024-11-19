@@ -12,12 +12,19 @@
 #include <postprocessing.h>
 
 #include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+
+#include "versa_ble.h"
+
+LOG_MODULE_REGISTER(launcher, LOG_LEVEL_INF);
 
 // K_THREAD_STACK_DEFINE(app_thread_stack, 4098);
 K_THREAD_STACK_DEFINE(app_thread_stack, 2048);
 struct k_thread app_thread;
 
 void cough_E(){
+
+    k_msleep(5000);
 
     // These two arrays contain the indexes of the features that are going to be extracted
     int16_t *indexes_audio_f = (int16_t*)k_malloc(N_AUDIO_FEATURES * sizeof(int16_t));
@@ -84,7 +91,6 @@ void cough_E(){
 
     init_state();
 
-
     // Looping through the windows
     while(1){
 
@@ -94,7 +100,9 @@ void cough_E(){
         if(fsm_state.model == IMU_MODEL){
 
             if(idx_start_window >= IMU_LEN){
-                break;
+                // break;
+                init_state();
+                idx_start_window = get_idx_window();
             }
 
             // Extract IMU features
@@ -124,7 +132,9 @@ void cough_E(){
         else { 
 
             if(idx_start_window >= AUDIO_LEN){
-                break;
+                // break;
+                init_state();
+                idx_start_window = get_idx_window();
             }
 
             // Extract AUDIO features
@@ -205,7 +215,12 @@ void cough_E(){
             }
             
             // printf("N_PEAKS FINAL: %d\n", n_peaks_final);
-            
+            LOG_INF("N_PEAKS: %d\n", n_peaks_final);
+            uint8_t final_data[5] = {n_peaks_final, n_peaks_final, n_peaks_final, n_peaks_final, n_peaks_final}; 
+            // receive_sensor_data(final_data, (size_t)5);
+            receive_sensor_data(&n_peaks_final, (size_t)1);
+            ble_receive_final_data(&n_peaks_final);
+
             // Reset postprocessing variables to their default value
             n_peaks = 0;
 
@@ -238,5 +253,5 @@ void cough_E(){
 
 void start_coughE_thread(){
     k_tid_t LED_thread_id = k_thread_create(&app_thread, app_thread_stack, K_THREAD_STACK_SIZEOF(app_thread_stack),
-                                        cough_E, NULL, NULL, NULL, 12, 0, K_NO_WAIT);
+                                        cough_E, NULL, NULL, NULL, 11, 0, K_NO_WAIT);
 }
