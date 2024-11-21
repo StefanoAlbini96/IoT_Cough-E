@@ -56,6 +56,8 @@ Description : Original version.
 #include "storage.h"
 #include "versa_time.h"
 #include "versa_ble.h"
+#include "versa_config.h"
+#include "SPI_Heepocrates.h"
 
 
 
@@ -512,13 +514,21 @@ void mlx90632_thread_func(void *arg1, void *arg2, void *arg3)
                 format.ObjectTemperature = ObjectTemperature;
 
 
-                int ret = storage_write_to_fifo((uint8_t *)&format, sizeof(format));
+                int ret = storage_add_to_fifo((uint8_t *)&format, sizeof(format));
                 if (ret != 0)
                 {
                     LOG_ERR("Error writing to flash\n");
                 }
 
-                receive_sensor_data((uint8_t *)&format, sizeof(format));
+                ble_add_to_fifo((uint8_t *)&format, sizeof(format));
+                if (VCONF_MLX90632_HEEPO)
+                {
+                    SPI_Heep_add_fifo((uint8_t *)&format, sizeof(format));
+                }
+                if(VCONF_MLX90632_APPDATA)
+                {
+                    app_data_add_to_fifo((uint8_t *)&format, sizeof(format));
+                }
             }
         }
         else 

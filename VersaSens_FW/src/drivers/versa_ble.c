@@ -360,13 +360,19 @@ void sensor_thread(void)
 /****************************************************************************/
 /****************************************************************************/
 
-void receive_sensor_data(uint8_t *data, size_t size)
+void ble_add_to_fifo(uint8_t *data, size_t size)
 {
 	if(!stream_data) {
 		return;
 	}
 	// Allocate a new sensor data
 	struct sensor_data_ble *new_data = k_malloc(sizeof(*new_data));
+
+	if (new_data == NULL)
+    {
+        LOG_ERR("Failed to allocate memory for new_data\n");
+        return;
+    }
 
 	// Set the sensor data
 	new_data->size = size < MAX_DATA_SIZE_BLE ? size : MAX_DATA_SIZE_BLE;

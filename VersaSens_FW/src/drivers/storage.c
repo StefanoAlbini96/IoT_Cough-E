@@ -304,7 +304,7 @@ int storage_read(const char *file_name, const char *path, uint8_t *data, size_t 
 /***************************************************************************/
 /***************************************************************************/
 
-int storage_write_to_fifo(uint8_t *data, size_t size)
+int storage_add_to_fifo(uint8_t *data, size_t size)
 {
     while(writing_in_progress)
     {

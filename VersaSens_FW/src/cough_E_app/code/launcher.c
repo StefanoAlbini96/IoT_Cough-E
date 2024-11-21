@@ -218,7 +218,7 @@ void cough_E(){
             LOG_INF("N_PEAKS: %d\n", n_peaks_final);
             uint8_t final_data[5] = {n_peaks_final, n_peaks_final, n_peaks_final, n_peaks_final, n_peaks_final}; 
             // receive_sensor_data(final_data, (size_t)5);
-            receive_sensor_data(&n_peaks_final, (size_t)1);
+            // receive_sensor_data(&n_peaks_final, (size_t)1);
             ble_receive_final_data(&n_peaks_final);
 
             // Reset postprocessing variables to their default value

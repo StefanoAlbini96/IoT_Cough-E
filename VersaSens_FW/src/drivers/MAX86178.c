@@ -57,6 +57,8 @@ Description : Original version.
 #include "versa_time.h"
 #include "versa_ble.h"
 #include <nrfx_gpiote.h>
+#include "versa_config.h"
+#include "SPI_Heepocrates.h"
 
 /****************************************************************************/
 /**                                                                        **/
@@ -660,8 +662,16 @@ void max86178_thread_func(void *arg1, void *arg2, void *arg3)
         MAX86178_Storage.index = index++;
         memcpy(MAX86178_Storage.data, data_read, MAX86178_FIFO_READ_SIZE);
 
-        storage_write_to_fifo((uint8_t *)&MAX86178_Storage, sizeof(MAX86178_Storage));
-        receive_sensor_data((uint8_t *)&MAX86178_Storage, sizeof(MAX86178_Storage));
+        storage_add_to_fifo((uint8_t *)&MAX86178_Storage, sizeof(MAX86178_Storage));
+        ble_add_to_fifo((uint8_t *)&MAX86178_Storage, sizeof(MAX86178_Storage));
+        if(VCONF_MAX86178_HEEPO)
+        {
+            SPI_Heep_add_fifo((uint8_t *)&MAX86178_Storage, sizeof(MAX86178_Storage));
+        }
+        if(VCONF_MAX86178_APPDATA)
+        {
+            app_data_add_to_fifo((uint8_t *)&MAX86178_Storage, sizeof(MAX86178_Storage));
+        }
 
         k_sleep(K_MSEC(25));
 

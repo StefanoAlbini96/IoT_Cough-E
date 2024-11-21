@@ -22,6 +22,7 @@
 #include <ff.h>
 #include <SPI_Heepocrates.h>
 #include <launcher.h>
+#include "app_data.h"
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
@@ -46,5 +47,23 @@ int main(void)
     while (1)
     {
         k_sleep(K_MSEC(1000));
+
+        // // data aquisition example
+        // k_sleep(K_MSEC(10));
+        // struct app_data_struct *data = k_malloc(sizeof(*data));
+        // if (data == NULL)
+        // {
+        //     LOG_ERR("Failed to allocate memory for new_data\n");
+        // }
+        // else
+        // {
+        //     app_data_get_from_fifo(data);
+        // }
+        
+        // if (data != NULL)
+        // {
+        //     LOG_INF("Data received from FIFO: %02hx", data->data[0]);
+        //     k_free(data);
+        // }
     }
 }

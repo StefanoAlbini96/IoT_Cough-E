@@ -56,6 +56,8 @@ Description : Original version.
 #include "storage.h"
 #include "versa_ble.h"
 #include "versa_time.h"
+#include "versa_config.h"
+#include "SPI_Heepocrates.h"
 
 /****************************************************************************/
 /**                                                                        **/
@@ -437,8 +439,16 @@ void max77658_thread_func(void *arg1, void *arg2, void *arg3)
             MAX77658_Storage.current = data_read[2];
             MAX77658_Storage.soc = data_read[3];
 
-            storage_write_to_fifo((uint8_t *)&MAX77658_Storage, sizeof(MAX77658_Storage));
-            receive_sensor_data((uint8_t *)&MAX77658_Storage, sizeof(MAX77658_Storage));
+            storage_add_to_fifo((uint8_t *)&MAX77658_Storage, sizeof(MAX77658_Storage));
+            ble_add_to_fifo((uint8_t *)&MAX77658_Storage, sizeof(MAX77658_Storage));
+            if(VCONF_MAX77658_HEEPO)
+            {
+                SPI_Heep_add_fifo((uint8_t *)&MAX77658_Storage, sizeof(MAX77658_Storage));
+            }
+            if(VCONF_MAX77658_APPDATA)
+            {
+                app_data_add_to_fifo((uint8_t *)&MAX77658_Storage, sizeof(MAX77658_Storage));
+            }
 
         }
 

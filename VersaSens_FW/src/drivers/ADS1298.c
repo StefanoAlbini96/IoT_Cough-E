@@ -59,6 +59,7 @@ Description : Original version.
 #include "versa_config.h"
 #include "spim_inst.h"
 #include "SPI_Heepocrates.h"
+#include "app_data.h"
 
 /****************************************************************************/
 /**                                                                        **/
@@ -587,7 +588,7 @@ void ADS1298_thread_func(void *arg1, void *arg2, void *arg3)
             // Send data to BLE if we have collected enough measurements
             if (ble_count == ADS1298_CONSEC_MEAS)
             {
-                receive_sensor_data((uint8_t *)&ble_datas, sizeof(ble_datas));
+                ble_add_to_fifo((uint8_t *)&ble_datas, sizeof(ble_datas));
                 ble_count = 0; // Reset the BLE counter
             }
         }
@@ -597,8 +598,15 @@ void ADS1298_thread_func(void *arg1, void *arg2, void *arg3)
         // If we have ADS1298_CONSEC_MEAS measurements, write them to storage
         if (storage_count == ADS1298_CONSEC_MEAS)
         {
-            int ret = storage_write_to_fifo((uint8_t *)&storage_datas, sizeof(storage_datas));
-            SPI_Heep_add_fifo((uint8_t *)&storage_datas, sizeof(storage_datas));
+            int ret = storage_add_to_fifo((uint8_t *)&storage_datas, sizeof(storage_datas));
+            if(VCONF_ADS1298_HEEPO)
+            {
+                SPI_Heep_add_fifo((uint8_t *)&storage_datas, sizeof(storage_datas));            
+            }
+            if (VCONF_ADS1298_APPDATA)
+            {
+                app_data_add_to_fifo((uint8_t *)&storage_datas, sizeof(storage_datas));
+            }
             storage_count = 0; // Reset the storage counter
         }
     }

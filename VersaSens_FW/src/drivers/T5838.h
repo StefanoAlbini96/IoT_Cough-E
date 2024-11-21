@@ -59,6 +59,10 @@ Description : Original version.
 #define PDM_CLK_PIN         43
 #define PDM_DATA_PIN        35
 
+#define OPUS_COMPLEXITY 1
+#define OPUS_VBR 1
+#define STORAGE_SIZE_HEADER 10
+
 /****************************************************************************/
 /**                                                                        **/
 /**                       TYPEDEFS AND STRUCTURES                          **/
@@ -94,56 +98,30 @@ typedef struct {
 /****************************************************************************/
 
 /**
- * @brief  This function starts the T5838 driver
- * 
- * @param  None
- * 
- * @retval 0 if successful, -1 otherwise
+ * @brief  Starts the T5838 driver.
+ * @return 0 on success, -1 on failure.
  */
 int t5838_start(void);
 
 /**
- * @brief  This function stops the T5838 driver
- * 
- * @param  None
- * 
- * @retval 0 if successful, -1 otherwise
+ * @brief  Stops the T5838 driver and releases resources.
+ * @return 0 on success, -1 on failure.
  */
 int t5838_stop(void);
 
 /**
- * @brief  This function initializes the T5838 driver
- * 
- * @param  None
- * 
- * @retval 0 if successful, -1 otherwise
+ * @brief  Initializes the T5838 driver, setting up clocks and pins and initializes all required peripherals.
+ * @return 0 on success, -1 on failure.
  */
 int t5838_init(void);
 
 /**
- * @brief  This function set up the frequency for the T5838
- * 
- * @param  freq: the frequency to set [kHz]
- * 
- * @retval 0 if successful, -1 otherwise
- */
-int t5838_set_freq(uint32_t freq);
-
-/**
- * @brief  This function starts the continuous saving of the data
- * 
- * @param  None
- * 
- * @retval None
+ * @brief  Starts continuous data saving from the T5838 driver in a separate thread.
  */
 void t5838_start_saving(void);
 
 /**
- * @brief  This function stops the continuous saving of the data
- * 
- * @param  None
- * 
- * @retval None
+ * @brief  Stops continuous data saving from the T5838 driver.
  */
 void t5838_stop_saving(void);
 

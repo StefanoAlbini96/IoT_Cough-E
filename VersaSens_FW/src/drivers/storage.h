@@ -120,7 +120,7 @@ int storage_read(const char *file_name, const char *path, uint8_t *data, size_t 
  * 
  * @return int - status of the operation (0 for success, non-zero for failure)
  */
-int storage_write_to_fifo(uint8_t *data, size_t size);
+int storage_add_to_fifo(uint8_t *data, size_t size);
 
 /**
  * @brief List the contents of a directory in the storage memory

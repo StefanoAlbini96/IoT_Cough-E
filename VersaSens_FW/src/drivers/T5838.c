@@ -57,6 +57,8 @@ Description : Original version.
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include "versa_time.h"
+#include "versa_config.h"
+#include "SPI_Heepocrates.h"
 
 #include "opus.h"
 #include "opus_types.h"
@@ -70,9 +72,7 @@ Description : Original version.
 
 LOG_MODULE_REGISTER(t5838, LOG_LEVEL_INF);
 
-#define PDM_BUFFER_SIZE        480
-
-#define T5838_PDM(idx)	       DT_NODELABEL(pdm##idx)
+#define PDM_BUFFER_SIZE        480    /*!< Size of the buffer for PDM frames */
 
 /****************************************************************************/
 /**                                                                        **/
@@ -80,11 +80,12 @@ LOG_MODULE_REGISTER(t5838, LOG_LEVEL_INF);
 /**                                                                        **/
 /****************************************************************************/
 
+/*! Buffer structure to hold PDM frames */
 struct {
-    int16_t t5838_frame1[PDM_BUFFER_SIZE];
-    int16_t t5838_frame2[PDM_BUFFER_SIZE];
-    int16_t t5838_frame3[PDM_BUFFER_SIZE];
-}t5838_frames;
+    int16_t frame1[PDM_BUFFER_SIZE];
+    int16_t frame2[PDM_BUFFER_SIZE];
+    int16_t frame3[PDM_BUFFER_SIZE];
+} t5838_frames;
 
 /****************************************************************************/
 /**                                                                        **/
@@ -109,11 +110,13 @@ void t5838_save_thread_func(void *arg1, void *arg2, void *arg3);
 /**                                                                        **/
 /****************************************************************************/
 
+/*! PDM frame active buffer */
 int16_t *t5838_frame = NULL;
 
-bool t5838_frame1_new = false;
-bool t5838_frame2_new = false;
-bool t5838_frame3_new = false;
+/*! Flags to track new PDM frame availability */
+bool frame1_new = false;
+bool frame2_new = false;
+bool frame3_new = false;
 
 /****************************************************************************/
 /**                                                                        **/
@@ -121,12 +124,13 @@ bool t5838_frame3_new = false;
 /**                                                                        **/
 /****************************************************************************/
 
-K_THREAD_STACK_DEFINE(T5838_save_thread_stack, 100000);
-struct k_thread T5838_save_thread;
+/*! Stack and thread data for saving PDM frames */
+K_THREAD_STACK_DEFINE(save_thread_stack, 100000);
+struct k_thread save_thread;
+bool save_thread_stop = false;
 
-volatile bool T5838_save_stop_thread = false;
-
-T5838_StorageFormat T5838_storage;
+/*! Structure to store encoded audio data */
+T5838_StorageFormat storage_format;
 
 /****************************************************************************/
 /**                                                                        **/
@@ -136,54 +140,27 @@ T5838_StorageFormat T5838_storage;
 
 static void pdm_handler(nrfx_pdm_evt_t const *event)
 {
-    /*! Check if a buffer is requested */
     if (event->buffer_requested) {
-        if (t5838_frame == t5838_frames.t5838_frame1)
-        {
-            t5838_frame = t5838_frames.t5838_frame2;
-        }
-        else if (t5838_frame == t5838_frames.t5838_frame2)
-        {
-            t5838_frame = t5838_frames.t5838_frame3;
-        }
-        else if (t5838_frame == t5838_frames.t5838_frame3 || t5838_frame == NULL)
-        {
-            t5838_frame = t5838_frames.t5838_frame1;
+        /* Rotate buffers as needed */
+        if (t5838_frame == t5838_frames.frame1) {
+            t5838_frame = t5838_frames.frame2;
+        } else if (t5838_frame == t5838_frames.frame2) {
+            t5838_frame = t5838_frames.frame3;
+        } else {
+            t5838_frame = t5838_frames.frame1;
         }
 
-        if(event->buffer_released == t5838_frames.t5838_frame1)
-        {
-            t5838_frame1_new = true;
-        }
-        else if(event->buffer_released == t5838_frames.t5838_frame2)
-        {
-            t5838_frame2_new = true;
-        }
-        else if(event->buffer_released == t5838_frames.t5838_frame3)
-        {
-            t5838_frame3_new = true;
+        /* Set flags for newly released buffers */
+        if (event->buffer_released == t5838_frames.frame1) {
+            frame1_new = true;
+        } else if (event->buffer_released == t5838_frames.frame2) {
+            frame2_new = true;
+        } else if (event->buffer_released == t5838_frames.frame3) {
+            frame3_new = true;
         }
 
         nrfx_pdm_buffer_set(t5838_frame, PDM_BUFFER_SIZE);
     }
-}
-
-/*****************************************************************************
-*****************************************************************************/
-
-int t5838_set_freq(uint32_t freq)
-{
-    nrfx_err_t status;
-    (void)status; 
-
-    /*! Get the default PDM configuration */
-    nrfx_pdm_config_t pdm_config = NRFX_PDM_DEFAULT_CONFIG(PDM_CLK_PIN, PDM_DATA_PIN);
-    pdm_config.clock_freq = NRF_PDM_FREQ_1000K / 1000.0 * freq;
-
-    /*! Initialize the PDM peripheral */
-    status = nrfx_pdm_reconfigure(&pdm_config);
-
-    return (status == NRFX_SUCCESS)? 0 : -1;
 }
 
 /*****************************************************************************
@@ -257,10 +234,10 @@ int t5838_init(void)
 
 void t5838_start_saving(void)
 {
-    T5838_save_stop_thread = false;
-    k_thread_create(&T5838_save_thread, T5838_save_thread_stack, K_THREAD_STACK_SIZEOF(T5838_save_thread_stack), 
+    save_thread_stop = false;
+    k_thread_create(&save_thread, save_thread_stack, K_THREAD_STACK_SIZEOF(save_thread_stack),
                     t5838_save_thread_func, NULL, NULL, NULL, T5838_PRIO, 0, K_NO_WAIT);
-    k_thread_name_set(&T5838_save_thread, "T5838_save_thread");
+    k_thread_name_set(&save_thread, "Save_Thread");
 }
 
 /****************************************************************************/
@@ -268,8 +245,7 @@ void t5838_start_saving(void)
 
 void t5838_stop_saving(void)
 {
-    T5838_save_stop_thread = true;
-    // k_thread_abort(&T5838_save_thread);
+    save_thread_stop = true;
 }
 
 /****************************************************************************/
@@ -280,107 +256,74 @@ void t5838_stop_saving(void)
 
 void t5838_save_thread_func(void *arg1, void *arg2, void *arg3)
 {
+    /* Initialize Opus Encoder */
     int error;
-    OpusEncoder *enc;
-    enc = opus_encoder_create(12000, 1, OPUS_APPLICATION_AUDIO, &error);
-    if (error != OPUS_OK)
-    {
-        LOG_ERR("Error: %s\n", opus_strerror(error));
+    OpusEncoder *encoder = opus_encoder_create(12000, 1, OPUS_APPLICATION_AUDIO, &error);
+    if (error != OPUS_OK) {
+        LOG_ERR("Opus encoder initialization error: %s\n", opus_strerror(error));
+        return;
     }
-    else
-    {
-        LOG_INF("Opus encoder initialized\n");
-    }
-    error = opus_encoder_ctl(enc, OPUS_SET_COMPLEXITY(1), OPUS_SET_VBR(1));
-    if (error != OPUS_OK)
-    {
-        LOG_ERR("Error: %s\n", opus_strerror(error));
-    }
-    else
-    {
-        LOG_INF("Opus encoder configured\n");
-    }
-    int16_t CompressedFrame[PDM_BUFFER_SIZE] = {0};
-    uint8_t len = 0;
-    uint8_t index = 0;
-    T5838_storage.header = 0xAAAA;
+    LOG_INF("Opus encoder initialized\n");
 
-    while (!T5838_save_stop_thread)
-    {
+    /* Configure Opus Encoder */
+    error = opus_encoder_ctl(encoder, OPUS_SET_COMPLEXITY(OPUS_COMPLEXITY), OPUS_SET_VBR(OPUS_VBR));
+    if (error != OPUS_OK) {
+        LOG_ERR("Opus encoder configuration error: %s\n", opus_strerror(error));
+        return;
+    }
+    LOG_INF("Opus encoder configured\n");
+
+    int16_t compressed_frame[PDM_BUFFER_SIZE] = {0};  /*!< Compressed output buffer */
+    uint8_t frame_index = 0;                           /*!< Frame sequence index */
+    storage_format.header = 0xAAAA;                    /*!< Storage header marker */
+
+    bool *frame_flags[] = {&frame1_new, &frame2_new, &frame3_new};  /*!< Pointers to frame flags */
+    int16_t *frames[] = {t5838_frames.frame1, t5838_frames.frame2, t5838_frames.frame3};  /*!< Frame pointers */
+
+    /* Main loop to handle new frames */
+    while (!save_thread_stop) {
         struct time_values current_time = get_time_values();
-        uint32_t rawtime_bin = current_time.rawtime_s_bin;
-        uint16_t time_ms_bin = current_time.time_ms_bin;
+        storage_format.rawtime_bin = current_time.rawtime_s_bin;
+        storage_format.time_ms_bin = current_time.time_ms_bin;
 
-        if (t5838_frame1_new)
-        {
-            t5838_frame1_new = false;
-            //start timmer
-            int start = k_uptime_get();
+        for (int i = 0; i < 3; i++) {
+            if (*frame_flags[i]) {
+                *frame_flags[i] = false;
 
-            len = (uint8_t)opus_encode(enc, t5838_frames.t5838_frame1, PDM_BUFFER_SIZE, CompressedFrame, PDM_BUFFER_SIZE) * sizeof(int16_t);
-            int end = k_uptime_get();
-            printk("Time to encode: %d\n", end - start);
-            T5838_storage.rawtime_bin = rawtime_bin;
-            T5838_storage.time_ms_bin = time_ms_bin;
-            T5838_storage.len = len+1;
-            T5838_storage.index = index;
-            index++;
-            memcpy(T5838_storage.data, CompressedFrame, len);
+                /* Encode frame using Opus */
+                int start_time = k_uptime_get();
+                uint8_t len = (uint8_t)opus_encode(encoder, frames[i], PDM_BUFFER_SIZE, compressed_frame, PDM_BUFFER_SIZE) * sizeof(int16_t);
+                int end_time = k_uptime_get();
+                printk("Encoding time: %d ms\n", end_time - start_time);
 
-            int ret = storage_write_to_fifo((uint8_t *)&T5838_storage, len + 10);
-            if (ret != 0)
-            {
-                LOG_ERR("Error writing to flash\n");
+                /* Store encoded data in storage format structure */
+                storage_format.len = len + 1;
+                storage_format.index = frame_index++;
+                memcpy(storage_format.data, compressed_frame, len);
+
+                /* Store and add data to buffers */
+                int ret = storage_add_to_fifo((uint8_t *)&storage_format, len + STORAGE_SIZE_HEADER);
+                if (ret != 0) {
+                    LOG_ERR("Error writing to flash\n");
+                }
+
+                /* Add to BLE and optional SPI Heep if configured */
+                ble_add_to_fifo((uint8_t *)&storage_format, len + STORAGE_SIZE_HEADER);
+                if (VCONF_T5838_HEEPO) {
+                    SPI_Heep_add_fifo((uint8_t *)&storage_format, len + STORAGE_SIZE_HEADER);
+                }
+                if(VCONF_T5838_APPDATA) {
+                    app_data_add_to_fifo((uint8_t *)&storage_format, len + STORAGE_SIZE_HEADER);
+                }
+
+                printk("Processed Frame %d, Length: %d bytes\n", i + 1, len);
             }
-            receive_sensor_data((uint8_t *)&T5838_storage, len + 10);
-
-            printk("Frame 1, len : %d\n", len);
         }
-        else if (t5838_frame2_new)
-        {
-            t5838_frame2_new = false;
 
-            len = (uint8_t)opus_encode(enc, t5838_frames.t5838_frame2, PDM_BUFFER_SIZE, CompressedFrame, PDM_BUFFER_SIZE) * sizeof(int16_t);
-            T5838_storage.rawtime_bin = rawtime_bin;
-            T5838_storage.time_ms_bin = time_ms_bin;
-            T5838_storage.len = len+1;
-            T5838_storage.index = index;
-            index++;
-            memcpy(T5838_storage.data, CompressedFrame, len);
-
-            int ret = storage_write_to_fifo((uint8_t *)&T5838_storage, len + 10);
-            if (ret != 0)
-            {
-                LOG_ERR("Error writing to flash\n");
-            }
-            receive_sensor_data((uint8_t *)&T5838_storage, len + 10);
-
-            printk("Frame 2, len : %d\n", len);
-        }
-        else if (t5838_frame3_new)
-        {
-            t5838_frame3_new = false;
-
-            len = (uint8_t)opus_encode(enc, t5838_frames.t5838_frame3, PDM_BUFFER_SIZE, CompressedFrame, PDM_BUFFER_SIZE) * sizeof(int16_t);
-            T5838_storage.rawtime_bin = rawtime_bin;
-            T5838_storage.time_ms_bin = time_ms_bin;
-            T5838_storage.len = len+1;
-            T5838_storage.index = index;
-            index++;
-            memcpy(T5838_storage.data, CompressedFrame, len);
-
-            int ret = storage_write_to_fifo((uint8_t *)&T5838_storage, len + 10);
-            if (ret != 0)
-            {
-                LOG_ERR("Error writing to flash\n");
-            }
-            receive_sensor_data((uint8_t *)&T5838_storage, len + 10);
-
-            printk("Frame 3, len : %d\n", len);
-            
-        }
-        k_sleep(K_MSEC(10));
+        k_sleep(K_MSEC(10));  /*!< Sleep briefly before checking for new frames */
     }
+
+    opus_encoder_destroy(encoder);
     k_thread_abort(k_current_get());
 }
 

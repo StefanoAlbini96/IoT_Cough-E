@@ -187,6 +187,13 @@ void SPI_Heep_add_fifo(uint8_t *data, size_t size)
         return;
     }
     struct sensor_data_heepo *p_data = k_malloc(sizeof(*p_data));
+
+    if (p_data == NULL)
+    {
+        LOG_ERR("Failed to allocate memory for k_malloc\n");
+        return;
+    }
+
     p_data->size = size;
     memcpy(p_data->data, data, size);
     k_fifo_put(&heepo_fifo, p_data);
