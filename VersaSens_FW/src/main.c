@@ -29,11 +29,11 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
 int main(void)
 {
-    nrf_gpio_cfg_output(START_PIN);
-    nrf_gpio_pin_set(START_PIN);
+    // nrf_gpio_cfg_output(START_PIN);
+    // nrf_gpio_pin_set(START_PIN);
     
     versa_init();
-    // enable_auto_connect();
+    enable_auto_connect();
     versa_config();
 
     versa_start_led_thread();
@@ -42,11 +42,10 @@ int main(void)
     // Start the Cough-E thread for the application
     start_coughE_thread(); 
 
-    // SPI_Heepocrates_init();
-
     while (1)
     {
         k_sleep(K_MSEC(1000));
+        // LOG_INF("HELLOW!\n");
 
         // // data aquisition example
         // k_sleep(K_MSEC(10));

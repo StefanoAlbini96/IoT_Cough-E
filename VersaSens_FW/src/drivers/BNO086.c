@@ -405,7 +405,7 @@ void bno086_save_thread_func(void *arg1, void *arg2, void *arg3)
         }
         if (VCONF_BNO086_APPDATA)
         {
-            app_data_add_to_fifo((uint8_t *)&bno_storage, sizeof(BNO086_StorageFormat));
+            add_bno086_data_to_fifo((uint8_t *)&bno_storage.data[0], 130);  // I send the index + the data = 13 Byetes x 10 = 130 Bytes
         }
         
         ble_add_to_fifo((uint8_t *)&bno_storage, sizeof(BNO086_StorageFormat));

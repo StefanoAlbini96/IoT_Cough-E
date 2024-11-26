@@ -78,8 +78,6 @@ struct app_data_struct {
 
 #ifndef _APP_DATA_C_SRC
 
-
-
 #endif  /* _APP_DATA_C_SRC */
 
 /****************************************************************************/
@@ -95,6 +93,11 @@ struct app_data_struct {
     * @param size the size of the data
 */
 void app_data_add_to_fifo(uint8_t *data, size_t size);
+
+void add_bno086_data_to_fifo(uint8_t *data, size_t size);
+uint8_t get_bno086_data_from_fifo(uint8_t *data);
+
+void add_t5838_data_to_fifo(uint8_t *data, size_t size);
 
 /****************************************************************************/
 /****************************************************************************/

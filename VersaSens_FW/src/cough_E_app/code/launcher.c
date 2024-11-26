@@ -15,6 +15,18 @@
 #include <zephyr/logging/log.h>
 
 #include "versa_ble.h"
+#include "app_data.h"
+
+
+#define IMU_ARRAY_SIZE 50       // 0.5 sec at 100 Hz
+#define AUD_ARRAY_SIZE 9600     // 0.8 sec at 12 kHz
+
+// Global array, stored in RAM
+float imu_data_array[IMU_ARRAY_SIZE][6];
+float aud_data_array[AUD_ARRAY_SIZE];
+
+
+
 
 LOG_MODULE_REGISTER(launcher, LOG_LEVEL_INF);
 
@@ -22,9 +34,15 @@ LOG_MODULE_REGISTER(launcher, LOG_LEVEL_INF);
 K_THREAD_STACK_DEFINE(app_thread_stack, 2048);
 struct k_thread app_thread;
 
+
+K_THREAD_STACK_DEFINE(app_data_thread_stack, 1024);
+struct k_thread app_data_thread;
+
 void cough_E(){
 
-    k_msleep(5000);
+    // k_msleep(5000);
+
+    // LOG_INF("COUGH-E RUNNING!\n");
 
     // These two arrays contain the indexes of the features that are going to be extracted
     int16_t *indexes_audio_f = (int16_t*)k_malloc(N_AUDIO_FEATURES * sizeof(int16_t));
@@ -215,8 +233,8 @@ void cough_E(){
             }
             
             // printf("N_PEAKS FINAL: %d\n", n_peaks_final);
-            LOG_INF("N_PEAKS: %d\n", n_peaks_final);
-            uint8_t final_data[5] = {n_peaks_final, n_peaks_final, n_peaks_final, n_peaks_final, n_peaks_final}; 
+            // LOG_INF("N_PEAKS: %d\n", n_peaks_final);
+            // uint8_t final_data[5] = {n_peaks_final, n_peaks_final, n_peaks_final, n_peaks_final, n_peaks_final}; 
             // receive_sensor_data(final_data, (size_t)5);
             // receive_sensor_data(&n_peaks_final, (size_t)1);
             ble_receive_final_data(&n_peaks_final);
@@ -251,7 +269,58 @@ void cough_E(){
 }
 
 
+
+
+void data_thread(){
+
+    LOG_INF("RUNNING DATA THREAD!\n");
+
+    int N_imu_data = 0;
+    int N_aud_data = 0;
+
+    while(1){
+
+
+        if(N_imu_data < IMU_ARRAY_SIZE){
+            // Get data from BNO086
+            uint8_t *new_data = (uint8_t*)malloc(13*10 * sizeof(uint8_t));
+            uint8_t res = get_bno086_data_from_fifo(new_data); // Gets 10 samples of 13 bytes each (index included)
+
+            if(new_data != NULL){
+                if((res != NULL)){
+
+                    LOG_INF("TOOK DATA (bno_foo)!");
+
+                    for(int i=0; i<10; i++){
+                        imu_data_array[N_imu_data+i][0] = (float)(uint16_t)((new_data[(i*10)+2] << 8) | (new_data[(i*10)+1]));
+                        imu_data_array[N_imu_data+i][1] = (float)(uint16_t)((new_data[(i*10)+4] << 8) | (new_data[(i*10)+3]));
+                        imu_data_array[N_imu_data+i][2] = (float)(uint16_t)((new_data[(i*10)+6] << 8) | (new_data[(i*10)+5]));
+                        imu_data_array[N_imu_data+i][3] = (float)(uint16_t)((new_data[(i*10)+8] << 8) | (new_data[(i*10)+7]));
+                        imu_data_array[N_imu_data+i][4] = (float)(uint16_t)((new_data[(i*10)+10] << 8) | (new_data[(i*10)+9]));
+                        imu_data_array[N_imu_data+i][5] = (float)(uint16_t)((new_data[(i*10)+12] << 8) | (new_data[(i*10)+11]));
+                    }
+                    N_imu_data += 10;
+                } else {
+                    // LOG_INF("NULL DATA READ!\n");
+
+                    LOG_INF("IMU DATA ready for proc!\n");
+                }
+
+                free(new_data);
+            }
+        }
+
+    }
+
+}
+
+
 void start_coughE_thread(){
-    k_tid_t LED_thread_id = k_thread_create(&app_thread, app_thread_stack, K_THREAD_STACK_SIZEOF(app_thread_stack),
-                                        cough_E, NULL, NULL, NULL, 11, 0, K_NO_WAIT);
+    // k_tid_t app_thread_id = k_thread_create(&app_thread, app_thread_stack, K_THREAD_STACK_SIZEOF(app_thread_stack),
+    //                                     cough_E, NULL, NULL, NULL, 11, 0, K_NO_WAIT);
+
+    k_tid_t app_data_thread_id = k_thread_create(&app_data_thread, app_data_thread_stack, K_THREAD_STACK_SIZEOF(app_data_thread_stack),
+                                        data_thread, NULL, NULL, NULL, 6, 0, K_NO_WAIT);
+
+    LOG_INF("COUGH-E thread initialized!\n");
 }

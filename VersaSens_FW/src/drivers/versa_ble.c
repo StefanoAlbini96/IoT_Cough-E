@@ -325,7 +325,8 @@ void sensor_thread(void)
 {
 	while (1) {
     	// Get sensor data
-    	struct sensor_data_ble *data = k_fifo_get(&ble_fifo, K_MSEC(100));	// NO_WAIT so not to block the other communication
+    	// struct sensor_data_ble *data = k_fifo_get(&ble_fifo, K_MSEC(100));	// NO_WAIT so not to block the other communication
+    	struct sensor_data_ble *data = k_fifo_get(&ble_fifo, K_MSEC(1));	// NO_WAIT so not to block the other communication
  
 		if (data != NULL){
 			// Send notification
@@ -388,6 +389,7 @@ void ble_receive_final_data(uint8_t *data){
 	struct app_result_ble *result_data = k_malloc(sizeof(*result_data));
 
 	result_data->result = *data;
+	LOG_INF("Adding %d to FIFO\n", *data);
 
 	k_fifo_put(&ble_out_fifo, result_data);
 }
@@ -399,7 +401,7 @@ void set_battery_data(uint16_t *data)
 {
 	// Convert the voltage to a battery percentage
 	uint8_t percent = (uint8_t)(((data[0] - 40960) * 100) / 7680);
-	LOG_INF("Battery : %d\n", percent);
+	// LOG_INF("Battery : %d\n", percent);
 	bt_bas_set_battery_level(percent); 
 }
 

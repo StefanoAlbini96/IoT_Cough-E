@@ -60,6 +60,9 @@ LOG_MODULE_REGISTER(app_data, LOG_LEVEL_INF);
 
 #define APP_DATA_FIFO_MAX_SIZE 10
 
+#define APP_DATA_BNO_FIFO_MAX   50
+#define APP_DATA_AUD_FIFO_MAX   9600
+
 /****************************************************************************/
 /**                                                                        **/
 /*                        TYPEDEFS AND STRUCTURES                           */
@@ -86,7 +89,13 @@ LOG_MODULE_REGISTER(app_data, LOG_LEVEL_INF);
 
 K_FIFO_DEFINE(app_data_fifo);
 
+K_FIFO_DEFINE(bno086_data_fifo);
+K_FIFO_DEFINE(t5838_data_fifo);
+
 uint8_t app_data_fifo_counter = 0;
+
+uint8_t app_data_BNO_fifo_counter = 0;
+uint8_t app_data_AUD_fifo_counter = 0;
 
 /****************************************************************************/
 /**                                                                        **/
@@ -98,6 +107,7 @@ void app_data_add_to_fifo(uint8_t *data, size_t size)
 {
     if (app_data_fifo_counter >= APP_DATA_FIFO_MAX_SIZE)
     {
+        // LOG_INF("BNO FIFO FULL!\n");
         return;
     }
 
@@ -116,8 +126,69 @@ void app_data_add_to_fifo(uint8_t *data, size_t size)
 
 	// Put the sensor data in the FIFO
 	k_fifo_put(&app_data_fifo, new_data);
+    // LOG_INF("ADDEDD DATA (app_data)!\n");
     app_data_fifo_counter++;
 }
+
+
+void add_bno086_data_to_fifo(uint8_t *data, size_t size){
+
+    if (app_data_BNO_fifo_counter >= APP_DATA_BNO_FIFO_MAX){
+        LOG_INF("BNO FIFO FULL!\n");
+        return;
+    }
+
+	struct app_data_struct *new_data = k_malloc(sizeof(*new_data));
+    if (new_data == NULL)
+    {
+        LOG_ERR("Failed to allocate memory for new_data\n");
+        return;
+    }
+
+	new_data->size = size < MAX_DATA_SIZE_APP_DATA ? size : MAX_DATA_SIZE_APP_DATA;
+	memcpy(new_data->data, data, new_data->size);
+    
+	// Put the sensor data in the FIFO
+	k_fifo_put(&bno086_data_fifo, new_data);
+    LOG_INF("ADDEDD DATA (bno_foo)!\n");
+    app_data_BNO_fifo_counter++;
+
+    free(new_data);
+}
+
+// Reads 10 samples of 12 bytes
+uint8_t get_bno086_data_from_fifo(uint8_t *data){
+
+    struct app_data_struct *new_data = k_fifo_get(&bno086_data_fifo, K_MSEC(10));
+    
+    if(new_data != NULL){
+        memcpy(data, new_data->data, 13*10);
+        app_data_BNO_fifo_counter--;
+        return -1;
+    } else {
+        return NULL;
+    }
+    free(new_data);
+}
+
+
+
+
+void add_t5838_data_to_fifo(uint8_t *data, size_t size){
+
+	struct app_data_struct *new_data = k_malloc(sizeof(*new_data));
+    if (new_data == NULL)
+    {
+        LOG_ERR("Failed to allocate memory for new_data\n");
+        return;
+    }
+
+	memcpy(new_data->data, data, new_data->size);
+
+	// Put the sensor data in the FIFO
+	k_fifo_put(&t5838_data_fifo, new_data);
+}
+
 
 /****************************************************************************/
 /****************************************************************************/

@@ -313,7 +313,8 @@ void t5838_save_thread_func(void *arg1, void *arg2, void *arg3)
                     SPI_Heep_add_fifo((uint8_t *)&storage_format, len + STORAGE_SIZE_HEADER);
                 }
                 if(VCONF_T5838_APPDATA) {
-                    app_data_add_to_fifo((uint8_t *)&storage_format, len + STORAGE_SIZE_HEADER);
+                    // app_data_add_to_fifo((uint8_t *)&storage_format, len + STORAGE_SIZE_HEADER);
+                    add_t5838_data_to_fifo((uint8_t *)&storage_format, len + STORAGE_SIZE_HEADER);
                 }
 
                 printk("Processed Frame %d, Length: %d bytes\n", i + 1, len);
