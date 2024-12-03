@@ -5,6 +5,9 @@
 
 /* Defines all the parameters of IMU features extraction */
 
+/* Sampling frequency of the IMU signal */
+#define IMU_FS 100
+
 #define WIND_LEN_IMU    0.5
 #define OVERLAP_IMU     50
 

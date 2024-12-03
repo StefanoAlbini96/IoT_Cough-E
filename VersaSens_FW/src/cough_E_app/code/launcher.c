@@ -19,28 +19,37 @@
 
 
 #define IMU_ARRAY_SIZE 50       // 0.5 sec at 100 Hz
-#define AUD_ARRAY_SIZE 9600     // 0.8 sec at 12 kHz
+#define AUD_ARRAY_SIZE 6400     // 0.8 sec at 8 kHz
 
 // Global array, stored in RAM
 float imu_data_array[IMU_ARRAY_SIZE][6];
-float aud_data_array[AUD_ARRAY_SIZE];
+float imu_data_array_to_proc[IMU_ARRAY_SIZE][6];
+int N_imu_data = 0;
+bool IMU_ready_to_proc = false;
 
+// float aud_data_array[AUD_ARRAY_SIZE];
+int N_aud_data = 0;
+bool AUD_ready_to_proc = false;
 
+// Set to true when the execution took place.
+// Useful to trigger the FSM update only when needed
+bool executed = false;  
 
 
 LOG_MODULE_REGISTER(launcher, LOG_LEVEL_INF);
 
 // K_THREAD_STACK_DEFINE(app_thread_stack, 4098);
-K_THREAD_STACK_DEFINE(app_thread_stack, 2048);
+K_THREAD_STACK_DEFINE(app_thread_stack, 4098);
 struct k_thread app_thread;
 
 
-K_THREAD_STACK_DEFINE(app_data_thread_stack, 1024);
+K_THREAD_STACK_DEFINE(app_data_thread_stack, 2048);
 struct k_thread app_data_thread;
 
 void cough_E(){
+    uint8_t dbg;
 
-    // k_msleep(5000);
+    // k_msleep(1000);
 
     // LOG_INF("COUGH-E RUNNING!\n");
 
@@ -112,86 +121,111 @@ void cough_E(){
     // Looping through the windows
     while(1){
 
-        idx_start_window = get_idx_window();
-        // printf("Start: %d\n", idx_start_window);
+        // idx_start_window = get_idx_window();
 
         if(fsm_state.model == IMU_MODEL){
 
-            if(idx_start_window >= IMU_LEN){
-                // break;
-                init_state();
-                idx_start_window = get_idx_window();
-            }
+            // if(idx_start_window >= IMU_LEN){
+            //     // break;
+            //     init_state();
+            //     idx_start_window = get_idx_window();
+            // }
 
-            // Extract IMU features
-            imu_features(imu_features_selector, &imu_in[idx_start_window], WINDOW_SAMP_IMU, imu_feature_array);
+            // Start processing only if there are enough samples
+            if(IMU_ready_to_proc){
 
-            // Fill the array of final imu features to feed into the IMU model
-            for(int16_t j=0; j<N_IMU_FEATURES; j++){
-                features_imu_model[j] = imu_feature_array[indexes_imu_f[j]];
-            }
-            if(imu_bio_feats_selector[0] == 1){
-                features_imu_model[N_IMU_FEATURES] = gender;
-            }
-            if(imu_bio_feats_selector[1] == 1){
-                features_imu_model[N_IMU_FEATURES+1] = bmi;
-            }
+                LOG_INF("IMU exec!\n");
+                IMU_ready_to_proc = false;
+                
+                dbg = 100;
+                ble_receive_final_data(&dbg);
 
-            // Predict with the IMU model
-            imu_proba = imu_predict(features_imu_model);
+                // Extract IMU features
+                // imu_features(imu_features_selector, &imu_in[idx_start_window], WINDOW_SAMP_IMU, imu_feature_array);
+                imu_features(imu_features_selector, &imu_data_array_to_proc[0], WINDOW_SAMP_IMU, imu_feature_array);
 
-            // Update the output of the FSM
-            if(imu_proba>=IMU_TH){
-                fsm_state.model_cls_out = COUGH_OUT;
-            } else {
-                fsm_state.model_cls_out = NON_COUGH_OUT;
+                dbg = 101;
+                ble_receive_final_data(&dbg);
+
+                // Fill the array of final imu features to feed into the IMU model
+                for(int16_t j=0; j<N_IMU_FEATURES; j++){
+                    features_imu_model[j] = imu_feature_array[indexes_imu_f[j]];
+                }
+                if(imu_bio_feats_selector[0] == 1){
+                    features_imu_model[N_IMU_FEATURES] = gender;
+                }
+                if(imu_bio_feats_selector[1] == 1){
+                    features_imu_model[N_IMU_FEATURES+1] = bmi;
+                }
+
+                // Predict with the IMU model
+                imu_proba = imu_predict(features_imu_model);
+
+                dbg = 102;
+                ble_receive_final_data(&dbg);
+
+                // Update the output of the FSM
+                if(imu_proba>=IMU_TH){
+                    fsm_state.model_cls_out = COUGH_OUT;
+                } else {
+                    fsm_state.model_cls_out = NON_COUGH_OUT;
+                }
+
+                executed = true;
             }
         }
         else { 
 
-            if(idx_start_window >= AUDIO_LEN){
-                // break;
-                init_state();
-                idx_start_window = get_idx_window();
-            }
+            // if(idx_start_window >= AUDIO_LEN){
+            //     // break;
+            //     init_state();
+            //     idx_start_window = get_idx_window();
+            // }
+            
+            if(AUD_ready_to_proc){
+                // Extract AUDIO features
+                // audio_features(audio_features_selector, &aud_data_array[0], WINDOW_SAMP_AUDIO, AUDIO_FS, audio_feature_array);
 
-            // Extract AUDIO features
-            audio_features(audio_features_selector, &audio_in.air[idx_start_window], WINDOW_SAMP_AUDIO, AUDIO_FS, audio_feature_array);
+                // Fill the array of fifeatures_imu_modelnal audio features to feed into the AUDIO model
+                for(int16_t j=0; j<N_AUDIO_FEATURES; j++){
+                    features_audio_model[j] = audio_feature_array[indexes_audio_f[j]];
+                }
+                if(audio_bio_feats_selector[0] == 1){
+                    features_audio_model[N_AUDIO_FEATURES] = gender;
+                }
+                if(audio_bio_feats_selector[1] == 1){
+                    features_audio_model[N_AUDIO_FEATURES+1] = bmi;
+                }
 
-            // Fill the array of fifeatures_imu_modelnal audio features to feed into the AUDIO model
-            for(int16_t j=0; j<N_AUDIO_FEATURES; j++){
-                features_audio_model[j] = audio_feature_array[indexes_audio_f[j]];
-            }
-            if(audio_bio_feats_selector[0] == 1){
-                features_audio_model[N_AUDIO_FEATURES] = gender;
-            }
-            if(audio_bio_feats_selector[1] == 1){
-                features_audio_model[N_AUDIO_FEATURES+1] = bmi;
-            }
+                audio_proba = audio_predict(features_audio_model);
 
-            audio_proba = audio_predict(features_audio_model);
+                // Update the output of the FSM
+                if(audio_proba >= AUDIO_TH){
+                    fsm_state.model_cls_out = COUGH_OUT;
+                } else {
+                    fsm_state.model_cls_out = NON_COUGH_OUT;
+                }
 
-            // Update the output of the FSM
-            if(audio_proba >= AUDIO_TH){
-                fsm_state.model_cls_out = COUGH_OUT;
-            } else {
-                fsm_state.model_cls_out = NON_COUGH_OUT;
+                // Identify the peaks   
+                // _get_cough_peaks(&aud_data_array[0], WINDOW_SAMP_AUDIO, AUDIO_FS, &starts[n_peaks], &ends[n_peaks], &locs[n_peaks], &peaks[n_peaks], &new_added);
+
+                // Readjust the indexes for the position of the current window (to get absolute index)
+                for(uint16_t j=0; j<new_added; j++){
+                    starts[n_peaks+j] += idx_start_window*AUDIO_STEP;
+                    ends[n_peaks+j] += idx_start_window*AUDIO_STEP;
+                    locs[n_peaks+j] += (idx_start_window*AUDIO_STEP);
+                    audio_confidence[n_peaks+j] = audio_proba;
+                }
+                n_peaks += new_added;
+
+                executed = true;
             }
-
-            // Identify the peaks   
-            _get_cough_peaks(&audio_in.air[idx_start_window], WINDOW_SAMP_AUDIO, AUDIO_FS, &starts[n_peaks], &ends[n_peaks], &locs[n_peaks], &peaks[n_peaks], &new_added);
-
-            // Readjust the indexes for the position of the current window (to get absolute index)
-            for(uint16_t j=0; j<new_added; j++){
-                starts[n_peaks+j] += idx_start_window*AUDIO_STEP;
-                ends[n_peaks+j] += idx_start_window*AUDIO_STEP;
-                locs[n_peaks+j] += (idx_start_window*AUDIO_STEP);
-                audio_confidence[n_peaks+j] = audio_proba;
-            }
-            n_peaks += new_added;
         }
 
-        update();
+        if(executed){
+            update();
+            executed = false;
+        }
 
         if(check_postprocessing()){
 
@@ -278,15 +312,19 @@ void data_thread(){
     int N_imu_data = 0;
     int N_aud_data = 0;
 
+    uint8_t res = 0;
+
     while(1){
 
 
         if(N_imu_data < IMU_ARRAY_SIZE){
             // Get data from BNO086
-            uint8_t *new_data = (uint8_t*)malloc(13*10 * sizeof(uint8_t));
-            uint8_t res = get_bno086_data_from_fifo(new_data); // Gets 10 samples of 13 bytes each (index included)
+            uint8_t *new_data = (uint8_t*)k_malloc(13*10 * sizeof(uint8_t));
 
             if(new_data != NULL){
+
+                res = get_bno086_data_from_fifo(new_data); // Gets 10 samples of 13 bytes each (index included)
+                
                 if((res != NULL)){
 
                     LOG_INF("TOOK DATA (bno_foo)!");
@@ -300,14 +338,16 @@ void data_thread(){
                         imu_data_array[N_imu_data+i][5] = (float)(uint16_t)((new_data[(i*10)+12] << 8) | (new_data[(i*10)+11]));
                     }
                     N_imu_data += 10;
-                } else {
-                    // LOG_INF("NULL DATA READ!\n");
-
-                    LOG_INF("IMU DATA ready for proc!\n");
+                    LOG_INF("N IMU DATA: %d\n", N_imu_data);
                 }
 
-                free(new_data);
+                k_free(new_data);
             }
+        } else {
+            LOG_INF("IMU DATA ready for proc!\n");
+            memcpy(&imu_data_array_to_proc, &imu_data_array, IMU_ARRAY_SIZE*6*sizeof(float));
+            N_imu_data = 0;
+            IMU_ready_to_proc = true;
         }
 
     }
@@ -316,8 +356,8 @@ void data_thread(){
 
 
 void start_coughE_thread(){
-    // k_tid_t app_thread_id = k_thread_create(&app_thread, app_thread_stack, K_THREAD_STACK_SIZEOF(app_thread_stack),
-    //                                     cough_E, NULL, NULL, NULL, 11, 0, K_NO_WAIT);
+    k_tid_t app_thread_id = k_thread_create(&app_thread, app_thread_stack, K_THREAD_STACK_SIZEOF(app_thread_stack),
+                                        cough_E, NULL, NULL, NULL, 11, 0, K_NO_WAIT);
 
     k_tid_t app_data_thread_id = k_thread_create(&app_data_thread, app_data_thread_stack, K_THREAD_STACK_SIZEOF(app_data_thread_stack),
                                         data_thread, NULL, NULL, NULL, 6, 0, K_NO_WAIT);

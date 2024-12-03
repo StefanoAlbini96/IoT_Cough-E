@@ -5,6 +5,9 @@
 
 /* Defines of the hyperparameters of audio features extraction */
 
+/* Sampling frequency */
+#define AUDIO_FS  8000
+
 
 #define WIND_LEN_AUD    0.8
 #define OVERLAP_AUD     50  

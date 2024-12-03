@@ -14,8 +14,8 @@
 //////////////////////////////////////
 /* Input data                       */
 // ///////////////////////////////////
-#include <audio_input_55502_w0_9wnds.h>
-#include <imu_input_55502_w0_9wnds.h>
+// #include <audio_input_55502_w0_9wnds.h>
+// #include <imu_input_55502_w0_9wnds.h>
 #include <bio_input_55502.h>
 //////////////////////////////////////
 
@@ -44,7 +44,7 @@
 #define RUN_MIXED
 
 #ifndef RUN_MIXED
-    #define RUN_ONLY_AUD        // Use only the audio modality
+    // #define RUN_ONLY_AUD        // Use only the audio modality
 
     #ifndef RUN_ONLY_AUD
         #define RUN_ONLY_IMU    // Use only the imu modality

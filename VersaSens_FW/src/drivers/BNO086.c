@@ -405,13 +405,13 @@ void bno086_save_thread_func(void *arg1, void *arg2, void *arg3)
         }
         if (VCONF_BNO086_APPDATA)
         {
-            add_bno086_data_to_fifo((uint8_t *)&bno_storage.data[0], 130);  // I send the index + the data = 13 Byetes x 10 = 130 Bytes
+            add_bno086_data_to_fifo((uint8_t *)&bno_storage.data[0], 13*10);  // I send the index + the data = 13 Byetes x 10 = 130 Bytes
         }
         
         ble_add_to_fifo((uint8_t *)&bno_storage, sizeof(BNO086_StorageFormat));
 
         bno086_frame_t *frame = (bno086_frame_t *)frame_write;
-        LOG_INF("Index: %02x", frame->B.index);
+        // LOG_INF("Index: %02x", frame->B.index);
         k_sleep(K_MSEC(1));
     }
     k_thread_abort(k_current_get());

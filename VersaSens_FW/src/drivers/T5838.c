@@ -125,7 +125,8 @@ bool frame3_new = false;
 /****************************************************************************/
 
 /*! Stack and thread data for saving PDM frames */
-K_THREAD_STACK_DEFINE(save_thread_stack, 100000);
+// K_THREAD_STACK_DEFINE(save_thread_stack, 100000);
+K_THREAD_STACK_DEFINE(save_thread_stack, 20000);
 struct k_thread save_thread;
 bool save_thread_stop = false;
 

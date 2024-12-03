@@ -147,6 +147,9 @@ void send_notification_to_custom_chara(void);
 void ble_receive_final_data(uint8_t *data);
 void ble_add_to_fifo(uint8_t *data, size_t size);
 
+
+void ble_receive_final_data_float(uint8_t *data);
+
 /*
     * @brief Receive the battery data for the BLE service
     * 

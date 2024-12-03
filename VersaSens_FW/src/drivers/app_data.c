@@ -151,24 +151,28 @@ void add_bno086_data_to_fifo(uint8_t *data, size_t size){
 	// Put the sensor data in the FIFO
 	k_fifo_put(&bno086_data_fifo, new_data);
     LOG_INF("ADDEDD DATA (bno_foo)!\n");
-    app_data_BNO_fifo_counter++;
-
-    free(new_data);
+    app_data_BNO_fifo_counter+=10;
 }
 
-// Reads 10 samples of 12 bytes
+// Reads 10 samples of 13 bytes (index included)
 uint8_t get_bno086_data_from_fifo(uint8_t *data){
 
-    struct app_data_struct *new_data = k_fifo_get(&bno086_data_fifo, K_MSEC(10));
+    // LOG_DBG("INSIDE!");
+    // return -1;
+
+    // struct app_data_struct *new_data = k_fifo_get(&bno086_data_fifo, K_MSEC(10));
+    struct app_data_struct *new_data = k_fifo_get(&bno086_data_fifo, K_FOREVER);
     
     if(new_data != NULL){
+        // LOG_INF("GET Succeded\n");
         memcpy(data, new_data->data, 13*10);
-        app_data_BNO_fifo_counter--;
+        k_free(new_data);
+        app_data_BNO_fifo_counter-=10;
         return -1;
     } else {
+        LOG_INF("NO_DATA\n");
         return NULL;
     }
-    free(new_data);
 }
 
 
