@@ -219,8 +219,8 @@ int t5838_init(void)
     pdm_config.mode = NRF_PDM_MODE_MONO;	//MONO
     pdm_config.edge = NRF_PDM_EDGE_LEFTFALLING;
     // pdm_config.clock_freq = NRF_PDM_FREQ_1000K * 0.768;
-    pdm_config.clock_freq = 260300800;
-    // pdm_config.clock_freq = 175304788;
+    // pdm_config.clock_freq = 260300800;
+    pdm_config.clock_freq = 175304704;
     pdm_config.ratio = NRF_PDM_RATIO_64X;
     pdm_config.mclksrc = NRF_PDM_MCLKSRC_ACLK;
 
