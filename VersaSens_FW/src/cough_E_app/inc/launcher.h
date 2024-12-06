@@ -41,10 +41,10 @@
 ////////////////////////////////////////////////
 
 // Execute in multimodal mode, using both modalities cooperating
-#define RUN_MIXED
+// #define RUN_MIXED
 
 #ifndef RUN_MIXED
-    // #define RUN_ONLY_AUD        // Use only the audio modality
+    #define RUN_ONLY_AUD        // Use only the audio modality
 
     #ifndef RUN_ONLY_AUD
         #define RUN_ONLY_IMU    // Use only the imu modality

@@ -70,6 +70,7 @@ struct app_data_struct {
 	size_t size;  // size of the data
 };
 
+
 /****************************************************************************/
 /**                                                                        **/
 /**                          EXPORTED VARIABLES                            **/
@@ -95,9 +96,10 @@ struct app_data_struct {
 void app_data_add_to_fifo(uint8_t *data, size_t size);
 
 void add_bno086_data_to_fifo(uint8_t *data, size_t size);
-uint8_t get_bno086_data_from_fifo(uint8_t *data);
+uint8_t* get_bno086_data_from_fifo(uint8_t *data);
 
 void add_t5838_data_to_fifo(uint8_t *data, size_t size);
+uint8_t* get_t5838_data_from_fifo(uint8_t *data);
 
 /****************************************************************************/
 /****************************************************************************/

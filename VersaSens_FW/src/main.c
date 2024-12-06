@@ -33,7 +33,7 @@ int main(void)
     // nrf_gpio_pin_set(START_PIN);
     
     versa_init();
-    enable_auto_connect();
+    // enable_auto_connect();
     versa_config();
 
     versa_start_led_thread();

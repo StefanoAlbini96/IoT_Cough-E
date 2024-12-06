@@ -50,6 +50,8 @@ Description : Original version.
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
+#include "versa_ble.h"
+
 /****************************************************************************/
 /**                                                                        **/
 /*                        DEFINITIONS AND MACROS                            */
@@ -60,8 +62,8 @@ LOG_MODULE_REGISTER(app_data, LOG_LEVEL_INF);
 
 #define APP_DATA_FIFO_MAX_SIZE 10
 
-#define APP_DATA_BNO_FIFO_MAX   50
-#define APP_DATA_AUD_FIFO_MAX   9600
+#define APP_DATA_BNO_FIFO_MAX   1000
+#define APP_DATA_AUD_FIFO_MAX   10000
 
 /****************************************************************************/
 /**                                                                        **/
@@ -95,7 +97,7 @@ K_FIFO_DEFINE(t5838_data_fifo);
 uint8_t app_data_fifo_counter = 0;
 
 uint8_t app_data_BNO_fifo_counter = 0;
-uint8_t app_data_AUD_fifo_counter = 0;
+uint16_t app_data_AUD_fifo_counter = 0;
 
 /****************************************************************************/
 /**                                                                        **/
@@ -134,6 +136,8 @@ void app_data_add_to_fifo(uint8_t *data, size_t size)
 void add_bno086_data_to_fifo(uint8_t *data, size_t size){
 
     if (app_data_BNO_fifo_counter >= APP_DATA_BNO_FIFO_MAX){
+        // uint8_t var = 61;
+        // ble_receive_final_data(&var);
         LOG_INF("BNO FIFO FULL!\n");
         return;
     }
@@ -145,20 +149,20 @@ void add_bno086_data_to_fifo(uint8_t *data, size_t size){
         return;
     }
 
-	new_data->size = size < MAX_DATA_SIZE_APP_DATA ? size : MAX_DATA_SIZE_APP_DATA;
+	new_data->size = size < APP_DATA_BNO_FIFO_MAX ? size : APP_DATA_BNO_FIFO_MAX;
 	memcpy(new_data->data, data, new_data->size);
     
 	// Put the sensor data in the FIFO
 	k_fifo_put(&bno086_data_fifo, new_data);
     LOG_INF("ADDEDD DATA (bno_foo)!\n");
     app_data_BNO_fifo_counter+=10;
+
+    // uint8_t head = 60;
+    // ble_receive_final_data(&head);
 }
 
 // Reads 10 samples of 13 bytes (index included)
-uint8_t get_bno086_data_from_fifo(uint8_t *data){
-
-    // LOG_DBG("INSIDE!");
-    // return -1;
+uint8_t* get_bno086_data_from_fifo(uint8_t *data){
 
     // struct app_data_struct *new_data = k_fifo_get(&bno086_data_fifo, K_MSEC(10));
     struct app_data_struct *new_data = k_fifo_get(&bno086_data_fifo, K_FOREVER);
@@ -180,6 +184,13 @@ uint8_t get_bno086_data_from_fifo(uint8_t *data){
 
 void add_t5838_data_to_fifo(uint8_t *data, size_t size){
 
+    if (app_data_AUD_fifo_counter >= APP_DATA_AUD_FIFO_MAX){
+        // uint8_t var = 51;
+        // ble_receive_final_data(&var);
+        LOG_INF("AUD FIFO FULL!\n");
+        return;
+    }
+
 	struct app_data_struct *new_data = k_malloc(sizeof(*new_data));
     if (new_data == NULL)
     {
@@ -187,10 +198,32 @@ void add_t5838_data_to_fifo(uint8_t *data, size_t size){
         return;
     }
 
+    new_data->size = size < APP_DATA_AUD_FIFO_MAX ? size : APP_DATA_AUD_FIFO_MAX;
 	memcpy(new_data->data, data, new_data->size);
-
+    
 	// Put the sensor data in the FIFO
 	k_fifo_put(&t5838_data_fifo, new_data);
+    app_data_AUD_fifo_counter+=size;
+
+    // uint8_t head = 50;
+    // uint8_t low = app_data_AUD_fifo_counter;
+    // uint8_t high = 50;
+    // ble_receive_final_data(&head);
+}
+
+
+uint8_t* get_t5838_data_from_fifo(uint8_t *data){
+    struct app_data_struct *new_data = k_fifo_get(&t5838_data_fifo, K_FOREVER);
+
+    if(new_data != NULL){
+        memcpy(data, new_data->data, 240);
+        k_free(new_data);
+        app_data_AUD_fifo_counter-=240;
+        return -1;
+    } else {
+        LOG_INF("NO DATA AUD\n");
+        return NULL;
+    }
 }
 
 

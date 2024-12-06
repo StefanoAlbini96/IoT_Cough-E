@@ -177,27 +177,27 @@ int versa_init(void)
     nrf_gpio_cfg_output(START_PIN);
     nrf_gpio_pin_clear(START_PIN);
 
-    if(vconf_max30001_en)
-    {
-        ret = sensors_list[MAX30001_ID].init();
-        if (ret == -2 & auto_disconnect)
-        {
-            vconf_max30001_en = 0;
-        }
-    }
+    // if(vconf_max30001_en)
+    // {
+    //     ret = sensors_list[MAX30001_ID].init();
+    //     if (ret == -2 & auto_disconnect)
+    //     {
+    //         vconf_max30001_en = 0;
+    //     }
+    // }
 
     k_sleep(K_MSEC(50));
 
-    if(vconf_max86178_en)
-    {
-        ret = sensors_list[MAX86178_ID].init();
-        if (ret == -2 & auto_disconnect)
-        {
-            vconf_max86178_en = 0;
-            vconf_t5838_en = 0;
-            vconf_mlx90632_en = 0;
-        }
-    }
+    // if(vconf_max86178_en)
+    // {
+    //     ret = sensors_list[MAX86178_ID].init();
+    //     if (ret == -2 & auto_disconnect)
+    //     {
+    //         vconf_max86178_en = 0;
+    //         vconf_t5838_en = 0;
+    //         vconf_mlx90632_en = 0;
+    //     }
+    // }
 
     k_sleep(K_MSEC(50));
 
@@ -215,21 +215,21 @@ int versa_init(void)
     
     k_sleep(K_MSEC(50));
 
-    if(vconf_ads1298_en)
-    {
-        ret = sensors_list[ADS1298_ID].init();
-        if (ret == -2 & auto_disconnect)
-        {
-            vconf_ads1298_en = 0;
-        }
-    }
+    // if(vconf_ads1298_en)
+    // {
+    //     ret = sensors_list[ADS1298_ID].init();
+    //     if (ret == -2 & auto_disconnect)
+    //     {
+    //         vconf_ads1298_en = 0;
+    //     }
+    // }
 
     k_sleep(K_MSEC(50));
 
-    if(vconf_mlx90632_en)
-    {
-        sensors_list[MLX90632_ID].init();
-    }
+    // if(vconf_mlx90632_en)
+    // {
+    //     sensors_list[MLX90632_ID].init();
+    // }
 
     set_status(0x01);
 
