@@ -339,9 +339,9 @@ void sensor_thread(void)
 					// nrf_gpio_pin_clear(27);
 				}
 			}
+			// Free the sensor data
+			k_free(data);
 		}
-    	// Free the sensor data
-    	k_free(data);
 
     	// Get output data (cough-counts)
 		struct app_result_ble *data_res = k_fifo_get(&ble_out_fifo, K_MSEC(100));
@@ -353,8 +353,8 @@ void sensor_thread(void)
 				if (ret_res != -ENOTCONN) {
 				}
 			}
+    		k_free(data_res);
 		}
-    	k_free(data_res);
 	}
 }
 

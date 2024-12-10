@@ -44,7 +44,14 @@ int main(void)
 
     while (1)
     {
-        k_sleep(K_MSEC(1000));
+        k_sleep(K_MSEC(500));
+        // int8_t *test = k_malloc(1000 * sizeof(int8_t));
+        // if(test != NULL){
+        //     LOG_INF("POINTER %p", test);
+        // } else {
+        //     LOG_ERR("ERRO ALLOC");
+        // }
+        // k_free(test);
         // LOG_INF("HELLOW!\n");
 
         // // data aquisition example

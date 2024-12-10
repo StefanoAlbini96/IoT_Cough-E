@@ -126,7 +126,7 @@ bool frame3_new = false;
 /****************************************************************************/
 
 /*! Stack and thread data for saving PDM frames */
-K_THREAD_STACK_DEFINE(save_thread_stack, 50000);
+K_THREAD_STACK_DEFINE(save_thread_stack, 10000);
 struct k_thread save_thread;
 bool save_thread_stop = false;
 
@@ -298,7 +298,6 @@ void t5838_save_thread_func(void *arg1, void *arg2, void *arg3)
                     SPI_Heep_add_fifo((uint8_t *)&storage_format, len + STORAGE_SIZE_HEADER);
                 }
                 if(VCONF_T5838_APPDATA) {
-                    // app_data_add_to_fifo((uint8_t *)&storage_format, len + STORAGE_SIZE_HEADER);
                     add_t5838_data_to_fifo((uint8_t *)&storage_format.data[0], len);
                 }
 
