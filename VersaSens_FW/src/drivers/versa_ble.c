@@ -326,7 +326,7 @@ void sensor_thread(void)
 	while (1) {
     	// Get sensor data
     	// struct sensor_data_ble *data = k_fifo_get(&ble_fifo, K_MSEC(100));	// NO_WAIT so not to block the other communication
-    	struct sensor_data_ble *data = k_fifo_get(&ble_fifo, K_MSEC(1));	// NO_WAIT so not to block the other communication
+    	struct sensor_data_ble *data = k_fifo_get(&ble_fifo, K_MSEC(100));	// NO_WAIT so not to block the other communication
  
 		if (data != NULL){
 			// Send notification
@@ -394,6 +394,43 @@ void ble_receive_final_data(uint8_t *data){
 	k_fifo_put(&ble_out_fifo, result_data);
 }
 
+
+void send_aud_wind_ble(float *data, uint16_t size){
+
+	uint16_t n_packets = (size*4) / 200;	// Will send 200 bytes per packet, the size is the number of floats
+
+	uint8_t bytes_to_send[203];
+	uint16_t idx_data = 0;
+
+	for(int p=0; p<n_packets; p++){
+
+		bytes_to_send[0] = 0xAA;	// header
+		bytes_to_send[1] = 0xAA;	// header
+		bytes_to_send[2] = 200;		// Length
+		
+		// Iterate until 50, in 200 bytes I can fit 50 floats
+		for(int i=0; i<50; i++){
+			uint8_t *bytes = (uint8_t*)&data[idx_data];
+			bytes_to_send[3+(i*4)+0] = bytes[0];
+			bytes_to_send[3+(i*4)+1] = bytes[1];
+			bytes_to_send[3+(i*4)+2] = bytes[2];
+			bytes_to_send[3+(i*4)+3] = bytes[3];
+			idx_data++;
+		}
+		struct sensor_data_ble *new_data = k_malloc(sizeof(*new_data));
+		if (new_data == NULL)
+		{
+			LOG_ERR("Failed to allocate memory for new_data\n");
+			return;
+		}
+
+		new_data->size = 203;
+		memcpy(new_data->data, &bytes_to_send[0], 203);
+		k_fifo_put(&ble_fifo, new_data);
+		LOG_INF("ADDED BLE DATA WIND!");
+	}
+
+}
 
 /****************************************************************************/
 /****************************************************************************/

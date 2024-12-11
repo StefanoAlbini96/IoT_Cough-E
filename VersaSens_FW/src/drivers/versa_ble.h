@@ -145,6 +145,9 @@ void send_notification_to_custom_chara(void);
     * @param size the size of the data
 */
 void ble_receive_final_data(uint8_t *data);
+
+void send_aud_wind_ble(float *data, uint16_t size);
+
 void ble_add_to_fifo(uint8_t *data, size_t size);
 
 

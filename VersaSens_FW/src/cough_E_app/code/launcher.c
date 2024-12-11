@@ -57,6 +57,11 @@ K_SEM_DEFINE(aud_sem, 0, 1);
 
 float processing_aud_wind[AUD_ARRAY_SIZE];
 
+#define DOWNSAMPLE_FACTOR 8
+#define DOWNSAMPLED_WIND_SIZE ((AUD_ARRAY_SIZE) / (DOWNSAMPLE_FACTOR))
+float downsampled_aud[3 * DOWNSAMPLED_WIND_SIZE];    // Accomodate up to 3 windows
+uint16_t downsample_idx = 0;    // Indices the next free space (how many have been added)
+
 
 // Set to true when the execution took place.
 // Useful to trigger the FSM update only when needed
@@ -376,6 +381,23 @@ struct k_thread app_data_thread;
 // }
 
 
+void downsample(const float *input, int input_length, float *output) {
+
+    uint16_t out_len = 0;
+
+    if (DOWNSAMPLE_FACTOR <= 0 || input_length <= 0) {
+        return;
+    }
+
+    // Calculate the length of the downsampled array
+    out_len = (input_length + DOWNSAMPLE_FACTOR - 1) / DOWNSAMPLE_FACTOR; // Ceiling division for safety
+
+    // Perform downsampling
+    for (int i = 0; i < out_len; i++) {
+        output[i] = input[i * DOWNSAMPLE_FACTOR];
+        downsample_idx++;
+    }
+}
 
 
 void data_thread(){
@@ -386,6 +408,8 @@ void data_thread(){
     int N_aud_data = 0;
 
     uint8_t res = 0;
+
+    float new_aud_datum = 0.0;
 
     while(1){
 
@@ -459,7 +483,13 @@ void data_thread(){
                 }
 
                 for(int i=0; i<120; i++){
-                    circ_buffer_aud[write_index_aud] = (float)((new_data_aud[(i*2)+1] << 8) | new_data_aud[(i*2)]);
+                    new_aud_datum = (float)((int16_t)((new_data_aud[(i*2)+1] << 8) | new_data_aud[(i*2)]));
+                    circ_buffer_aud[write_index_aud] = new_aud_datum;
+
+                    // if(i % DOWNSAMPLE_FACTOR == 0){
+                    //     downsampled_aud[downsample_idx] = new_aud_datum;
+                    //     downsample_idx++;
+                    // }
 
                     write_index_aud = (write_index_aud + 1) % AUD_BUF_SIZE;
 
@@ -547,6 +577,7 @@ void iot_cough_E(){
     // Number of peaks for which the model confidence is above the threshold
     uint16_t n_idxs_above_th = 0;
 
+    float mean, std;
 
     init_state();
 
@@ -567,6 +598,20 @@ void iot_cough_E(){
         read_index_aud = (read_index_aud + AUDIO_STEP) % AUD_BUF_SIZE;
         data_count_aud -= AUDIO_STEP;
 
+        // Normalization
+        vect_mean_std_norm(processing_aud_wind, WINDOW_SAMP_AUDIO);
+        
+        int idx = 0;
+        for(int j=0; j<((WINDOW_SAMP_AUDIO*4)/200); j++){
+            storage_add_to_fifo((uint8_t *)&processing_aud_wind[idx], 200);
+            idx += 50;
+        }
+        storage_add_to_fifo((uint8_t *)processing_aud_wind, WINDOW_SAMP_AUDIO * 4);
+
+        LOG_INF("Bef add: %d", downsample_idx);
+        downsample(&processing_aud_wind[WINDOW_SAMP_AUDIO/2], WINDOW_SAMP_AUDIO/2, &downsampled_aud[downsample_idx]);
+        LOG_INF("Aft add: %d", downsample_idx);
+        
         // Extract AUDIO features
         audio_features(audio_features_selector, &processing_aud_wind[0], WINDOW_SAMP_AUDIO, AUDIO_FS, audio_feature_array);
         LOG_INF("Feats!");
@@ -605,12 +650,13 @@ void iot_cough_E(){
         }
         n_peaks += new_added;
 
-
         update();
         LOG_INF("Time last: %f\n", fsm_state.time_from_last_out);
 
         if(check_postprocessing()){
             LOG_INF("SEM TAKEN!");
+
+            send_aud_wind_ble(downsampled_aud, downsample_idx);
 
             uint16_t n_peaks_final = 0;
 
@@ -655,6 +701,10 @@ void iot_cough_E(){
             n_peaks = 0;
 
             n_idxs_above_th = 0;
+            
+            LOG_INF("N DOWNSMPLD: %d", downsample_idx);
+            downsample_idx = 0;
+            LOG_INF("N DOWNSMPLD: %d", downsample_idx);
         }
 
         k_mutex_unlock(&aud_buffer_mutex);
