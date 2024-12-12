@@ -101,6 +101,9 @@ uint8_t* get_bno086_data_from_fifo(uint8_t *data);
 void add_t5838_data_to_fifo(uint8_t *data, size_t size);
 uint8_t* get_t5838_data_from_fifo(uint8_t *data);
 
+void send_storage_raw(float *sig, int len);
+void send_storage_raw_8(uint8_t *sig, int len);
+
 /****************************************************************************/
 /****************************************************************************/
 

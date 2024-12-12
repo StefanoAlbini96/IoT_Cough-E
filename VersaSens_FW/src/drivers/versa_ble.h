@@ -146,7 +146,7 @@ void send_notification_to_custom_chara(void);
 */
 void ble_receive_final_data(uint8_t *data);
 
-void send_aud_wind_ble(float *data, uint16_t size);
+void send_aud_wind_ble(float *data, uint16_t size, uint8_t n_peaks);
 
 void ble_add_to_fifo(uint8_t *data, size_t size);
 

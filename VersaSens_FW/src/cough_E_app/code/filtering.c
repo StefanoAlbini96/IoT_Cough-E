@@ -5,6 +5,7 @@
 #include <helpers.h>
 #include <filters_parameters.h>
 #include <zephyr/kernel.h>
+#include <math.h>
 
 
 /*
@@ -96,4 +97,27 @@ void filtfilt(const float *sig, int len, const float *b, const float* a, const f
     k_free(res_padded);
     k_free(initial);
     k_free(reverse);
+}
+
+
+// High pass filtering
+
+// Constants
+#define PI 3.141592653589793
+
+// Function to initialize the high-pass filter
+void init_high_pass_filter(HighPassFilter *filter, float sample_rate, float cutoff_freq) {
+    float rc = 1.0f / (2.0f * PI * cutoff_freq); // Time constant
+    float dt = 1.0f / sample_rate;              // Sampling period
+    filter->alpha = rc / (rc + dt);             // Filter coefficient
+    filter->prev_input = 0.0f;
+    filter->prev_output = 0.0f;
+}
+
+// Function to apply the high-pass filter
+float apply_high_pass_filter(HighPassFilter *filter, float input) {
+    float output = filter->alpha * (filter->prev_output + input - filter->prev_input);
+    filter->prev_input = input;
+    filter->prev_output = output;
+    return output;
 }

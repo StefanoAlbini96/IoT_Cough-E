@@ -43,6 +43,7 @@ float vect_sum(const float *x, int16_t len);
 float vect_mean(const float *x, int16_t len);
 void vect_mult(float *x, const float *y, int16_t len, float *r);
 float vect_std(float *x, int16_t len);
+void vect_mean_std_norm(float *x, uint16_t len);
 void vect_copy(const float *in, int16_t start, int16_t len, float *out);
 void vect_copy_uint16_t(uint16_t *in, int16_t start, int16_t len, uint16_t *out);
 void sub_constant(const float *x, int16_t len, float constant, float *res);

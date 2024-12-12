@@ -10,6 +10,7 @@
 #include <audio_features.h>
 #include <imu_features.h>
 #include <postprocessing.h>
+#include <filtering.h>
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -33,20 +34,20 @@ int N_aud_data = 0;
 bool AUD_ready_to_proc = false;
 
 
-// #define IMU_BUF_SIZE    100
-// static float circ_buffer_imu[IMU_BUF_SIZE][6];
-// static int write_index_imu = 0;
-// static int read_index_imu = 0;
-// static int data_count_imu = 0;
+#define IMU_BUF_SIZE    100
+static float circ_buffer_imu[IMU_BUF_SIZE][6];
+static int write_index_imu = 0;
+static int read_index_imu = 0;
+static int data_count_imu = 0;
 
-// static struct k_mutex imu_buffer_mutex;
-// K_SEM_DEFINE(imu_sem, 0, 1);
+static struct k_mutex imu_buffer_mutex;
+K_SEM_DEFINE(imu_sem, 0, 1);
 
-// float processing_imu_wind[IMU_ARRAY_SIZE][6];
+float processing_imu_wind[IMU_ARRAY_SIZE][6];
 
 
 
-#define AUD_BUF_SIZE    7000
+#define AUD_BUF_SIZE    13000
 static float circ_buffer_aud[AUD_BUF_SIZE];
 static int write_index_aud = 0;
 static int read_index_aud = 0;
@@ -57,7 +58,9 @@ K_SEM_DEFINE(aud_sem, 0, 1);
 
 float processing_aud_wind[AUD_ARRAY_SIZE];
 
-#define DOWNSAMPLE_FACTOR 8
+
+
+#define DOWNSAMPLE_FACTOR 32
 #define DOWNSAMPLED_WIND_SIZE ((AUD_ARRAY_SIZE) / (DOWNSAMPLE_FACTOR))
 float downsampled_aud[3 * DOWNSAMPLED_WIND_SIZE];    // Accomodate up to 3 windows
 uint16_t downsample_idx = 0;    // Indices the next free space (how many have been added)
@@ -400,6 +403,11 @@ void downsample(const float *input, int input_length, float *output) {
 }
 
 
+
+float buf[120];
+uint8_t buf8[240];
+
+
 void data_thread(){
 
     LOG_INF("RUNNING DATA THREAD!\n");
@@ -413,7 +421,7 @@ void data_thread(){
 
     while(1){
 
-        // Get data from BNO086
+        // // Get data from BNO086
         // uint8_t *new_data = (uint8_t*)k_malloc(13*10 * sizeof(uint8_t));
 
         // if(new_data != NULL){
@@ -422,12 +430,11 @@ void data_thread(){
             
         //     if((res != NULL)){
 
-        //         LOG_INF("TOOK DATA (bno_foo)!");
-
-        //         int dbg = 161;
-        //         ble_receive_final_data(&dbg);
-
-        //         // k_mutex_lock(&imu_buffer_mutex, K_FOREVER);
+        //         if (k_mutex_lock(&aud_buffer_mutex, K_FOREVER) == 0){
+        //             // LOG_INF("Data MUTEX lock!");
+        //         } else {
+        //             // LOG_INF("Data MUTEX lock failed!");
+        //         }
 
         //         for(int i=0; i<10; i++){
         //             circ_buffer_imu[write_index_imu][0] = (float)(uint16_t)((new_data[(i*10)+2] << 8) | (new_data[(i*10)+1]));
@@ -445,25 +452,19 @@ void data_thread(){
         //                 // Overwrite oldest data (move read pointer)
         //                 read_index_imu = (read_index_imu + 1) % IMU_BUF_SIZE;
         //             }
-
-        //             // Signal the consumer if enough data is ready
-        //             // if (data_count_imu >= WINDOW_SAMP_IMU) {
-        //             //     k_sem_give(&imu_sem);
-        //             // }
         //         }
 
-        //         // k_mutex_unlock(&imu_buffer_mutex);
-        //         // LOG_INF("N IMU DATA: %d\n", N_imu_data);
+        //         if (data_count_imu >= WINDOW_SAMP_IMU){
+        //             if (k_sem_count_get(&imu_sem) == 0){
+        //                 k_sem_give(&imu_sem);
+        //                 k_msleep(10);
+        //             }
+        //         }
+
+        //         k_mutex_unlock(&imu_buffer_mutex);
         //     }
 
         //     k_free(new_data);
-
-        // //     }
-        // // } else {
-        // //     LOG_INF("IMU DATA ready for proc!\n");
-        // //     memcpy(&imu_data_array_to_proc, &imu_data_array, IMU_ARRAY_SIZE*6*sizeof(float));
-        // //     N_imu_data = 0;
-        // //     IMU_ready_to_proc = true;
         // }
 
         // Get data from T5838
@@ -475,7 +476,8 @@ void data_thread(){
             
             if((res != NULL)){
                 
-                // LOG_INF("NEW DATA ITER!");
+                LOG_INF("NEW DATA ITER!");
+
                 if (k_mutex_lock(&aud_buffer_mutex, K_FOREVER) == 0){
                     // LOG_INF("Data MUTEX lock!");
                 } else {
@@ -485,11 +487,6 @@ void data_thread(){
                 for(int i=0; i<120; i++){
                     new_aud_datum = (float)((int16_t)((new_data_aud[(i*2)+1] << 8) | new_data_aud[(i*2)]));
                     circ_buffer_aud[write_index_aud] = new_aud_datum;
-
-                    // if(i % DOWNSAMPLE_FACTOR == 0){
-                    //     downsampled_aud[downsample_idx] = new_aud_datum;
-                    //     downsample_idx++;
-                    // }
 
                     write_index_aud = (write_index_aud + 1) % AUD_BUF_SIZE;
 
@@ -501,23 +498,15 @@ void data_thread(){
                     }
                 }
 
-                LOG_INF("Data count: %d\n", data_count_aud);
                 // Signal the consumer if enough data is ready
-                // LOG_INF("DAT SEM: %d", k_sem_count_get(&aud_sem));
                 if (data_count_aud >= WINDOW_SAMP_AUDIO) {
                     if (k_sem_count_get(&aud_sem) == 0){
                         k_sem_give(&aud_sem);
-                        // LOG_INF("Data SEM give!");
-                        // LOG_INF("SEM coun: %d", k_sem_count_get(&aud_sem));
+                        k_msleep(10);
                     }
                 }
 
-                // if (data_count_aud >= WINDOW_SAMP_AUDIO){
-                //     ready = true;
-                // }
-
                 k_mutex_unlock(&aud_buffer_mutex);
-                // LOG_INF("Data MUTEX unlock!\n");
             }
 
             k_free(new_data_aud);
@@ -526,8 +515,6 @@ void data_thread(){
     }
 
 }
-
-
 
 
 void iot_cough_E(){
@@ -575,20 +562,21 @@ void iot_cough_E(){
     uint32_t idx_start_window = 0;
 
     // Number of peaks for which the model confidence is above the threshold
-    uint16_t n_idxs_above_th = 0;
+    uint16_t n_idxs_above_th = 0;    
 
-    float mean, std;
+
+    float sample_rate = 8000.0f; // Sampling rate in Hz
+    float cutoff_freq = 400.0f; // Cutoff frequency in Hz
+
+    HighPassFilter filter;
+    init_high_pass_filter(&filter, sample_rate, cutoff_freq);
 
     init_state();
 
     while(1){
         k_sem_take(&aud_sem, K_FOREVER);
-        LOG_INF("SEM TAKEN!");
         k_mutex_lock(&aud_buffer_mutex, K_FOREVER);
 
-        // LOG_INF("%f", circ_buffer_aud[read_index_aud]);
-        // int t = 100;
-        // ble_receive_final_data(&t);
         
         
         // Get a window from the circular buffer
@@ -598,23 +586,17 @@ void iot_cough_E(){
         read_index_aud = (read_index_aud + AUDIO_STEP) % AUD_BUF_SIZE;
         data_count_aud -= AUDIO_STEP;
 
+        for (size_t i = 0; i < WINDOW_SAMP_AUDIO; ++i) {
+            processing_aud_wind[i] = apply_high_pass_filter(&filter, processing_aud_wind[i]);
+        }
+
         // Normalization
         vect_mean_std_norm(processing_aud_wind, WINDOW_SAMP_AUDIO);
-        
-        int idx = 0;
-        for(int j=0; j<((WINDOW_SAMP_AUDIO*4)/200); j++){
-            storage_add_to_fifo((uint8_t *)&processing_aud_wind[idx], 200);
-            idx += 50;
-        }
-        storage_add_to_fifo((uint8_t *)processing_aud_wind, WINDOW_SAMP_AUDIO * 4);
 
-        LOG_INF("Bef add: %d", downsample_idx);
         downsample(&processing_aud_wind[WINDOW_SAMP_AUDIO/2], WINDOW_SAMP_AUDIO/2, &downsampled_aud[downsample_idx]);
-        LOG_INF("Aft add: %d", downsample_idx);
-        
+
         // Extract AUDIO features
         audio_features(audio_features_selector, &processing_aud_wind[0], WINDOW_SAMP_AUDIO, AUDIO_FS, audio_feature_array);
-        LOG_INF("Feats!");
 
         // Fill the array of fifeatures_imu_modelnal audio features to feed into the AUDIO model
         for(int16_t j=0; j<N_AUDIO_FEATURES; j++){
@@ -628,7 +610,6 @@ void iot_cough_E(){
         }
 
         audio_proba = audio_predict(features_audio_model);
-        LOG_INF("Predict --> proba: %f", audio_proba);
 
         // Update the output of the FSM
         if(audio_proba >= AUDIO_TH){
@@ -639,7 +620,6 @@ void iot_cough_E(){
 
         // Identify the peaks   
         _get_cough_peaks(&processing_aud_wind[0], WINDOW_SAMP_AUDIO, AUDIO_FS, &starts[n_peaks], &ends[n_peaks], &locs[n_peaks], &peaks[n_peaks], &new_added);
-        LOG_INF("Cough peaks!");
 
         // Readjust the indexes for the position of the current window (to get absolute index)
         for(uint16_t j=0; j<new_added; j++){
@@ -651,12 +631,8 @@ void iot_cough_E(){
         n_peaks += new_added;
 
         update();
-        LOG_INF("Time last: %f\n", fsm_state.time_from_last_out);
 
         if(check_postprocessing()){
-            LOG_INF("SEM TAKEN!");
-
-            send_aud_wind_ble(downsampled_aud, downsample_idx);
 
             uint16_t n_peaks_final = 0;
 
@@ -685,7 +661,6 @@ void iot_cough_E(){
                     above_peaks[i] = peaks[idxs_above_th[i]];
                 }
 
-                // TODO: stai passando due volte gli stessi parametri!
                 n_peaks_final = _clean_cough_segments(final_starts, final_ends, above_locs, above_peaks, n_idxs_above_th, AUDIO_FS);
 
                 k_free(idxs_above_th);
@@ -695,16 +670,15 @@ void iot_cough_E(){
                 k_free(above_peaks);
             }
             
-            ble_receive_final_data(&n_peaks_final);
+            // ble_receive_final_data(&n_peaks_final);
+            send_aud_wind_ble(downsampled_aud, downsample_idx, n_peaks_final);
 
             // Reset postprocessing variables to their default value
             n_peaks = 0;
 
             n_idxs_above_th = 0;
             
-            LOG_INF("N DOWNSMPLD: %d", downsample_idx);
             downsample_idx = 0;
-            LOG_INF("N DOWNSMPLD: %d", downsample_idx);
         }
 
         k_mutex_unlock(&aud_buffer_mutex);
@@ -717,13 +691,14 @@ void start_coughE_thread(){
     k_mutex_init(&aud_buffer_mutex);
     k_sem_init(&aud_sem, 0, 1);
 
-    // k_tid_t app_thread_id = k_thread_create(&app_thread, app_thread_stack, K_THREAD_STACK_SIZEOF(app_thread_stack),
-    //                                     cough_E, NULL, NULL, NULL, 11, 0, K_NO_WAIT);
+    k_mutex_init(&imu_buffer_mutex);
+    k_sem_init(&imu_sem, 0, 1);
+
     k_tid_t app_thread_id = k_thread_create(&app_thread, app_thread_stack, K_THREAD_STACK_SIZEOF(app_thread_stack),
                                         iot_cough_E, NULL, NULL, NULL, 11, 0, K_NO_WAIT);
 
     k_tid_t app_data_thread_id = k_thread_create(&app_data_thread, app_data_thread_stack, K_THREAD_STACK_SIZEOF(app_data_thread_stack),
-                                        data_thread, NULL, NULL, NULL, 6, 0, K_NO_WAIT);
+                                        data_thread, NULL, NULL, NULL, 3, 0, K_NO_WAIT);
 
     LOG_INF("COUGH-E thread initialized!\n");
 }

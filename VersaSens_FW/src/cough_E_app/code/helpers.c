@@ -159,6 +159,16 @@ float vect_std(float *x, int16_t len){
 }
 
 
+void vect_mean_std_norm(float *x, uint16_t len){
+    float mean = vect_mean(x, len);
+    float std = vect_std(x, len);
+
+    for(int i=0; i<len; i++){
+        x[i] = ((x[i] - mean) / std);
+    }
+}
+
+
 /*
     Copies "len" samples from "in" array starting at index "start"
     Destination is "out"

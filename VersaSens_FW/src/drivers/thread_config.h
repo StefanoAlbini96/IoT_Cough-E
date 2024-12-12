@@ -76,7 +76,7 @@ Description : Original version.
 #define MLX90632_PRIO       K_PRIO_PREEMPT(7)
 
 /*Priority of the T5838 thread */
-#define T5838_PRIO          K_PRIO_PREEMPT(8)
+#define T5838_PRIO          K_PRIO_PREEMPT(2)
 
 /*Priority of the Bluetooth thread */
 #define BLE_PRIO            K_PRIO_PREEMPT(2)

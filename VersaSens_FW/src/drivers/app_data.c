@@ -51,6 +51,7 @@ Description : Original version.
 #include <zephyr/logging/log.h>
 
 #include "versa_ble.h"
+#include "storage.h"
 
 /****************************************************************************/
 /**                                                                        **/
@@ -65,6 +66,7 @@ LOG_MODULE_REGISTER(app_data, LOG_LEVEL_INF);
 // Max size for the FIFO (10 elements each)
 #define APP_DATA_BNO_FIFO_MAX_SIZE 100      // 10 elements of 10 samples
 #define APP_DATA_AUD_FIFO_MAX_SIZE 2400     // 10 elements of 120 samples
+#define APP_DATA_AUD_FIFO_MAX_SIZE 5000     // 10 elements of 120 samples
 
 // Size of the single elements
 #define MAX_SIZE_BNO_ELEM   130     // 10 samples with 12 bytes of data + 1 index
@@ -143,7 +145,7 @@ void add_bno086_data_to_fifo(uint8_t *data, size_t size){
     if (app_data_BNO_fifo_counter >= APP_DATA_BNO_FIFO_MAX_SIZE){
         // uint8_t var = 61;
         // ble_receive_final_data(&var);
-        LOG_INF("BNO FIFO FULL!\n");
+        // LOG_INF("BNO FIFO FULL!\n");
         return;
     }
 
@@ -159,7 +161,7 @@ void add_bno086_data_to_fifo(uint8_t *data, size_t size){
     
 	// Put the sensor data in the FIFO
 	k_fifo_put(&bno086_data_fifo, new_data);
-    LOG_INF("ADDEDD DATA (bno_foo)!\n");
+    // LOG_INF("ADDEDD DATA (bno_foo)!\n");
     app_data_BNO_fifo_counter+=10;
 
     // uint8_t head = 60;
@@ -203,7 +205,7 @@ void add_t5838_data_to_fifo(uint8_t *data, size_t size){
 
     new_data->size = size < MAX_SIZE_AUD_ELEM ? size : MAX_SIZE_AUD_ELEM;
 	memcpy(new_data->data, data, new_data->size);
-    LOG_INF("ADDEDD DATA (AUD_foo)!\n");
+    // LOG_INF("ADDEDD DATA (AUD_foo)!\n");
     
 	// Put the sensor data in the FIFO
 	k_fifo_put(&t5838_data_fifo, new_data);
@@ -225,6 +227,67 @@ uint8_t* get_t5838_data_from_fifo(uint8_t *data){
     }
 }
 
+
+void send_storage_raw(float *sig, int len){
+
+    int pack_size = 120;
+    int n_floats_per_pack = (int)(pack_size/4);
+
+    int idx = 0;
+    uint8_t bytes_to_send[pack_size];
+
+    int n_packets = (int)((len * 4) / pack_size);
+
+    for(int j=0; j<n_packets; j++){
+
+        for(int i=0; i<n_floats_per_pack; i++){
+            uint8_t *bytes = (uint8_t*)&sig[idx];
+            bytes_to_send[(i*4)+0] = bytes[0];
+            bytes_to_send[(i*4)+1] = bytes[1];
+            bytes_to_send[(i*4)+2] = bytes[2];
+            bytes_to_send[(i*4)+3] = bytes[3];
+            idx++;
+        }
+
+        int ret = storage_add_to_fifo((uint8_t *)&sig[idx], pack_size);
+        if (ret != 0) {
+            LOG_ERR("Error writing to flash\n");
+        }
+
+        k_msleep(1);
+    }
+}
+
+
+void send_storage_raw_8(uint8_t *sig, int len){
+
+    int pack_size = 240;
+    // int n_floats_per_pack = (int)(pack_size/4);
+
+    int idx = 0;
+    // uint8_t bytes_to_send[pack_size];
+
+    int n_packets = (int)(len / pack_size);
+
+    for(int j=0; j<n_packets; j++){
+
+        // for(int i=0; i<n_floats_per_pack; i++){
+        //     uint8_t *bytes = (uint8_t*)&sig[idx];
+        //     bytes_to_send[(i*4)+0] = bytes[0];
+        //     bytes_to_send[(i*4)+1] = bytes[1];
+        //     bytes_to_send[(i*4)+2] = bytes[2];
+        //     bytes_to_send[(i*4)+3] = bytes[3];
+        //     idx++;
+        // }
+
+        int ret = storage_add_to_fifo(sig, pack_size);
+        if (ret != 0) {
+            LOG_ERR("Error writing to flash\n");
+        }
+
+        k_msleep(1);
+    }
+}
 
 /****************************************************************************/
 /****************************************************************************/

@@ -394,43 +394,111 @@ void ble_receive_final_data(uint8_t *data){
 	k_fifo_put(&ble_out_fifo, result_data);
 }
 
+void send_aud_wind_ble(float *data, uint16_t size, uint8_t n_peaks) {
+    uint16_t floats_per_packet = 50; // 50 floats per packet (200 bytes for data)
+    uint16_t full_packet_size = 205; // Includes 4-byte header
+    uint16_t remaining_floats = size;
+    uint16_t idx_data = 0;
 
-void send_aud_wind_ble(float *data, uint16_t size){
+    uint8_t bytes_to_send[205];
 
-	uint16_t n_packets = (size*4) / 200;	// Will send 200 bytes per packet, the size is the number of floats
+    // Send the first packet with size information
+    memset(bytes_to_send, 0, sizeof(bytes_to_send));
+    bytes_to_send[0] = 0xAA; // Header
+    bytes_to_send[1] = 0xAA; // Header
+	bytes_to_send[2] = n_peaks;
+    bytes_to_send[3] = (size * 4) & 0xFF;       // Lower byte of size
+    bytes_to_send[4] = ((size * 4) >> 8) & 0xFF; // Higher byte of size
 
-	uint8_t bytes_to_send[203];
-	uint16_t idx_data = 0;
+    for (int i = 0; i < floats_per_packet && idx_data < size; i++) {
+        uint8_t *bytes = (uint8_t *)&data[idx_data];
+        bytes_to_send[5 + (i * 4) + 0] = bytes[0];
+        bytes_to_send[5 + (i * 4) + 1] = bytes[1];
+        bytes_to_send[5 + (i * 4) + 2] = bytes[2];
+        bytes_to_send[5 + (i * 4) + 3] = bytes[3];
+        idx_data++;
+        remaining_floats--;
+    }
 
-	for(int p=0; p<n_packets; p++){
+    struct sensor_data_ble *new_data = k_malloc(sizeof(*new_data));
+    if (new_data == NULL) {
+        LOG_ERR("Failed to allocate memory for new_data\n");
+        return;
+    }
+    new_data->size = full_packet_size;
+    memcpy(new_data->data, &bytes_to_send[0], full_packet_size);
+    k_fifo_put(&ble_fifo, new_data);
+    LOG_INF("Sent BLE header packet with size information!");
 
-		bytes_to_send[0] = 0xAA;	// header
-		bytes_to_send[1] = 0xAA;	// header
-		bytes_to_send[2] = 200;		// Length
-		
-		// Iterate until 50, in 200 bytes I can fit 50 floats
-		for(int i=0; i<50; i++){
-			uint8_t *bytes = (uint8_t*)&data[idx_data];
-			bytes_to_send[3+(i*4)+0] = bytes[0];
-			bytes_to_send[3+(i*4)+1] = bytes[1];
-			bytes_to_send[3+(i*4)+2] = bytes[2];
-			bytes_to_send[3+(i*4)+3] = bytes[3];
-			idx_data++;
-		}
-		struct sensor_data_ble *new_data = k_malloc(sizeof(*new_data));
-		if (new_data == NULL)
-		{
-			LOG_ERR("Failed to allocate memory for new_data\n");
-			return;
-		}
+    // Send remaining packets
+    while (remaining_floats > 0) {
+        uint16_t floats_in_packet = remaining_floats >= floats_per_packet ? floats_per_packet : remaining_floats;
 
-		new_data->size = 203;
-		memcpy(new_data->data, &bytes_to_send[0], 203);
-		k_fifo_put(&ble_fifo, new_data);
-		LOG_INF("ADDED BLE DATA WIND!");
-	}
+        memset(bytes_to_send, 0, sizeof(bytes_to_send));
+        bytes_to_send[0] = 0xBB; // Header for each packet
+        bytes_to_send[1] = 0xBB; // Header for each packet
+        bytes_to_send[2] = (size * 4) & 0xFF;       // Lower byte of size
+        bytes_to_send[3] = ((size * 4) >> 8) & 0xFF; // Higher byte of size
 
+        for (int i = 0; i < floats_in_packet; i++) {
+            uint8_t *bytes = (uint8_t *)&data[idx_data];
+            bytes_to_send[4 + (i * 4) + 0] = bytes[0];
+            bytes_to_send[4 + (i * 4) + 1] = bytes[1];
+            bytes_to_send[4 + (i * 4) + 2] = bytes[2];
+            bytes_to_send[4 + (i * 4) + 3] = bytes[3];
+            idx_data++;
+        }
+
+        new_data = k_malloc(sizeof(*new_data));
+        if (new_data == NULL) {
+            LOG_ERR("Failed to allocate memory for new_data\n");
+            return;
+        }
+        new_data->size = 4 + floats_in_packet * 4; // Header (4 bytes) + data bytes
+        memcpy(new_data->data, &bytes_to_send[0], new_data->size);
+        k_fifo_put(&ble_fifo, new_data);
+        LOG_INF("Sent BLE data packet with %d floats!", floats_in_packet);
+
+        remaining_floats -= floats_in_packet;
+    }
 }
+
+// void send_aud_wind_ble(float *data, uint16_t size){
+
+// 	uint16_t n_packets = (size*4) / 200;	// Will send 200 bytes per packet, the size is the number of floats
+
+// 	uint8_t bytes_to_send[203];
+// 	uint16_t idx_data = 0;
+
+// 	for(int p=0; p<n_packets; p++){
+
+// 		bytes_to_send[0] = 0xAA;	// header
+// 		bytes_to_send[1] = 0xAA;	// header
+// 		bytes_to_send[2] = 200;		// Length
+		
+// 		// Iterate until 50, in 200 bytes I can fit 50 floats
+// 		for(int i=0; i<50; i++){
+// 			uint8_t *bytes = (uint8_t*)&data[idx_data];
+// 			bytes_to_send[3+(i*4)+0] = bytes[0];
+// 			bytes_to_send[3+(i*4)+1] = bytes[1];
+// 			bytes_to_send[3+(i*4)+2] = bytes[2];
+// 			bytes_to_send[3+(i*4)+3] = bytes[3];
+// 			idx_data++;
+// 		}
+// 		struct sensor_data_ble *new_data = k_malloc(sizeof(*new_data));
+// 		if (new_data == NULL)
+// 		{
+// 			LOG_ERR("Failed to allocate memory for new_data\n");
+// 			return;
+// 		}
+
+// 		new_data->size = 203;
+// 		memcpy(new_data->data, &bytes_to_send[0], 203);
+// 		k_fifo_put(&ble_fifo, new_data);
+// 		LOG_INF("ADDED BLE DATA WIND!");
+// 	}
+
+// }
 
 /****************************************************************************/
 /****************************************************************************/
