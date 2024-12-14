@@ -223,6 +223,7 @@ int t5838_init(void)
     pdm_config.clock_freq = 175304704;
     pdm_config.ratio = NRF_PDM_RATIO_64X;
     pdm_config.mclksrc = NRF_PDM_MCLKSRC_ACLK;
+    // pdm_config.gain_l = 0x00;
 
     /*! Initialize the PDM peripheral */
     status = nrfx_pdm_init(&pdm_config, pdm_handler);
@@ -301,7 +302,7 @@ void t5838_save_thread_func(void *arg1, void *arg2, void *arg3)
                     add_t5838_data_to_fifo((uint8_t *)&storage_format.data[0], len);
                 }
 
-                printk("Processed Frame %d, Length: %d bytes\n", i + 1, len);
+                // printk("Processed Frame %d, Length: %d bytes\n", i + 1, len);
             }
         }
 

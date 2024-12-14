@@ -145,7 +145,7 @@ void add_bno086_data_to_fifo(uint8_t *data, size_t size){
     if (app_data_BNO_fifo_counter >= APP_DATA_BNO_FIFO_MAX_SIZE){
         // uint8_t var = 61;
         // ble_receive_final_data(&var);
-        // LOG_INF("BNO FIFO FULL!\n");
+        LOG_INF("BNO FIFO FULL!\n");
         return;
     }
 
@@ -161,7 +161,7 @@ void add_bno086_data_to_fifo(uint8_t *data, size_t size){
     
 	// Put the sensor data in the FIFO
 	k_fifo_put(&bno086_data_fifo, new_data);
-    // LOG_INF("ADDEDD DATA (bno_foo)!\n");
+    LOG_INF("ADDEDD DATA (bno_foo)!\n");
     app_data_BNO_fifo_counter+=10;
 
     // uint8_t head = 60;
@@ -205,7 +205,7 @@ void add_t5838_data_to_fifo(uint8_t *data, size_t size){
 
     new_data->size = size < MAX_SIZE_AUD_ELEM ? size : MAX_SIZE_AUD_ELEM;
 	memcpy(new_data->data, data, new_data->size);
-    // LOG_INF("ADDEDD DATA (AUD_foo)!\n");
+    LOG_INF("ADDEDD DATA (AUD_foo)!\n");
     
 	// Put the sensor data in the FIFO
 	k_fifo_put(&t5838_data_fifo, new_data);
