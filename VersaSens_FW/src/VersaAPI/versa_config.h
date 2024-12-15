@@ -86,7 +86,7 @@ Description : Original version.
 
 /* Enable/Disable sensors */
 #define VCONF_ADS1298_EN        0
-#define VCONF_BNO086_EN         1
+#define VCONF_BNO086_EN         0
 #define VCONF_MAX30001_EN       0
 #define VCONF_MAX86178_EN       0
 #define VCONF_MLX90632_EN       0
@@ -109,7 +109,7 @@ Description : Original version.
 #define VCONF_MLX90632_APPDATA  0
 #define VCONF_T5838_APPDATA     1
 #define VCONF_MAX77658_APPDATA  0
-#define VCONF_BNO086_APPDATA    1
+#define VCONF_BNO086_APPDATA    0
 
 
 /* ADS1298 configuration */
